@@ -1,21 +1,23 @@
-mod component;
-mod entity;
-mod event_loop;
-mod system;
+pub mod component;
+pub mod entity;
+pub mod event_loop;
+pub mod system;
 
 pub use event_loop::EventLoop;
 
 use component::Component;
 use entity::Entity;
-use system::{Query, System};
+use std::any::Any;
 use std::rc::Rc;
+use system::{Query, System};
 
 pub struct World {
     event_loop: Option<EventLoop>,
     entities: Vec<Entity>,
-    components: Vec<Rc<dyn Component>>,
+    components: Vec<Component<Rc<dyn Any>>>,
     fixed_systems: Vec<System>,
-    dependent_systems: Vec<System>
+    dependent_systems: Vec<System>,
+    current_id: u32,
 }
 
 impl World {
@@ -24,19 +26,57 @@ impl World {
     }
 
     pub fn run(&mut self) {
-        let mut dependent = |alpha: f32| {
-            self.dependent_systems.iter().for_each(|e| {
-                e.execute(Query::new(self.components.clone(), &e.components))
-            }); 
-        };
-
         if let Some(event_loop) = &mut self.event_loop {
-            event_loop.begin(|| {}, Some(dependent));
+            event_loop.begin(
+                |fixed| {
+                    if fixed {
+                        self.fixed_systems.iter().for_each(|e| {
+                            e.execute(Query::new(&mut self.components, &e.components))
+                        });
+                    } else {
+                        self.dependent_systems.iter().for_each(|e| {
+                            e.execute(Query::new(&mut self.components, &e.components));
+                        });
+                    }
+                },
+            );
         } else {
             loop {
-                dependent(0.0);
+                self.dependent_systems.iter().for_each(|e| {
+                    e.execute(Query::new(&mut self.components, &e.components));
+                });
             }
         }
+    }
+
+    pub fn new_entity(&mut self) -> Entity {
+        self.entities.push(Entity::new(self.current_id));
+        self.current_id += 1;
+        *self.entities.last().unwrap()
+    }
+
+    pub fn add_component<T: Any + Clone>(&mut self, entity: Entity, data: T) {
+        for e in self.components.iter_mut() {
+            if e.type_id == std::any::TypeId::of::<T>() {
+                e.add_entity(entity, Rc::new(data.clone()));
+                return;
+            }
+        }
+
+        self.components
+            .push(Component::new(std::any::TypeId::of::<T>()));
+        self.components
+            .last_mut()
+            .unwrap()
+            .add_entity(entity, Rc::new(data.clone()));
+        }
+
+    pub fn add_fixed_system(&mut self, system: System) {
+        self.fixed_systems.push(system);
+    }
+
+    pub fn add_dependent_system(&mut self, system: System) {
+        self.dependent_systems.push(system);
     }
 }
 
@@ -61,7 +101,8 @@ impl WorldBuilder {
             entities: Vec::new(),
             components: Vec::new(),
             fixed_systems: Vec::new(),
-            dependent_systems: Vec::new()
+            dependent_systems: Vec::new(),
+            current_id: 0,
         }
     }
 }

@@ -12,7 +12,7 @@ impl EventLoop {
         }
     }
 
-    pub fn begin(&mut self, fixed: impl Fn(), dependent: Option<impl Fn(f32)>) {
+    pub fn begin(&mut self, mut exec: impl FnMut(bool)) {
         let mut previous_time = Instant::now();
         let mut accumulator: f32 = 0.0;
 
@@ -23,14 +23,12 @@ impl EventLoop {
 
             accumulator += delta_time.as_secs_f32();
             while accumulator >= self.period {
-                fixed();
+                exec(true);
 
                 accumulator -= self.period;
             }
 
-            if let Some(dependent) = dependent.as_ref() {
-                dependent(accumulator / self.period)
-            }
+            exec(false /*accumulator / self.period*/)
         }
     }
 }
