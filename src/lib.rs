@@ -27,19 +27,17 @@ impl World {
 
     pub fn run(&mut self) {
         if let Some(event_loop) = &mut self.event_loop {
-            event_loop.begin(
-                |fixed| {
-                    if fixed {
-                        self.fixed_systems.iter().for_each(|e| {
-                            e.execute(Query::new(&mut self.components, &e.components))
-                        });
-                    } else {
-                        self.dependent_systems.iter().for_each(|e| {
-                            e.execute(Query::new(&mut self.components, &e.components));
-                        });
-                    }
-                },
-            );
+            event_loop.begin(|fixed| {
+                if fixed {
+                    self.fixed_systems
+                        .iter()
+                        .for_each(|e| e.execute(Query::new(&mut self.components, &e.components)));
+                } else {
+                    self.dependent_systems.iter().for_each(|e| {
+                        e.execute(Query::new(&mut self.components, &e.components));
+                    });
+                }
+            });
         } else {
             loop {
                 self.dependent_systems.iter().for_each(|e| {
@@ -69,7 +67,7 @@ impl World {
             .last_mut()
             .unwrap()
             .add_entity(entity, Rc::new(data.clone()));
-        }
+    }
 
     pub fn add_fixed_system(&mut self, system: System) {
         self.fixed_systems.push(system);
