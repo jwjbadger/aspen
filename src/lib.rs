@@ -8,11 +8,12 @@ pub use event_loop::EventLoop;
 use component::Component;
 use entity::Entity;
 use system::{Query, System};
+use std::rc::Rc;
 
 pub struct World {
     event_loop: Option<EventLoop>,
     entities: Vec<Entity>,
-    components: Vec<Box<dyn Component>>,
+    components: Vec<Rc<dyn Component>>,
     fixed_systems: Vec<System>,
     dependent_systems: Vec<System>
 }
@@ -23,7 +24,11 @@ impl World {
     }
 
     pub fn run(&mut self) {
-        let dependent = |alpha: f32| {};
+        let mut dependent = |alpha: f32| {
+            self.dependent_systems.iter().for_each(|e| {
+                e.execute(Query::new(self.components.clone(), &e.components))
+            }); 
+        };
 
         if let Some(event_loop) = &mut self.event_loop {
             event_loop.begin(|| {}, Some(dependent));
