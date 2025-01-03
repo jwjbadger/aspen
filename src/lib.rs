@@ -1,23 +1,31 @@
 pub mod component;
 pub mod entity;
 pub mod event_loop;
+pub mod graphics;
+pub mod os;
 pub mod system;
 
-pub use event_loop::EventLoop;
+pub use crate::{
+    component::Component,
+    entity::Entity,
+    event_loop::EventLoop,
+    system::{Query, System},
+    graphics::{Renderer, WgpuRenderer},
+};
 
-use component::Component;
-use entity::Entity;
-use std::any::Any;
-use std::rc::Rc;
-use system::{Query, System};
+use crate::os::WindowHandler;
 
-pub struct World {
+use std::{any::Any, rc::Rc};
+
+pub struct World<R: Renderer = WgpuRenderer> {
     event_loop: Option<EventLoop>,
     entities: Vec<Entity>,
     components: Vec<Component<Rc<dyn Any>>>,
     fixed_systems: Vec<System>,
     dependent_systems: Vec<System>,
     current_id: u32,
+    window_handler: Option<WindowHandler>,
+    renderer: Option<Box<R>>,
 }
 
 impl World {
@@ -38,12 +46,6 @@ impl World {
                     });
                 }
             });
-        } else {
-            loop {
-                self.dependent_systems.iter().for_each(|e| {
-                    e.execute(Query::new(&mut self.components, &e.components));
-                });
-            }
         }
     }
 
@@ -78,9 +80,20 @@ impl World {
     }
 }
 
-#[derive(Default)]
-pub struct WorldBuilder {
+pub struct WorldBuilder<R: Renderer = WgpuRenderer> {
     fixed_loop_period: Option<u16>,
+    window_handler: bool,
+    renderer: Option<Box<R>>
+}
+
+impl Default for WorldBuilder {
+    fn default() -> Self {
+        WorldBuilder {
+            fixed_loop_period: None,
+            window_handler: false,
+            renderer: None,
+        }
+    }
 }
 
 impl WorldBuilder {
@@ -88,12 +101,17 @@ impl WorldBuilder {
         WorldBuilder::default()
     }
 
-    pub fn timed_loop(mut self, period: u16) -> Self {
+    pub fn with_fixed_loop(mut self, period: u16) -> Self {
         self.fixed_loop_period = Some(period);
         self
     }
 
-    pub fn build(&self) -> World {
+    pub fn graphical(mut self) -> Self {
+        self.window_handler = true;
+        self
+    }
+
+    pub fn build(self) -> World {
         World {
             event_loop: self.fixed_loop_period.map(|e| EventLoop::new(e)),
             entities: Vec::new(),
@@ -101,6 +119,8 @@ impl WorldBuilder {
             fixed_systems: Vec::new(),
             dependent_systems: Vec::new(),
             current_id: 0,
+            window_handler: self.window_handler.then(|| WindowHandler::new()),
+            renderer: self.window_handler.then(|| self.renderer.unwrap_or(Box::new(WgpuRenderer))),
         }
     }
 }

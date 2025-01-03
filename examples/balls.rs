@@ -20,7 +20,7 @@ struct Velocity {
 }
 
 fn main() {
-    let mut world = WorldBuilder::new().timed_loop(60).build();
+    let mut world = WorldBuilder::new().with_fixed_loop(60).graphical().build();
 
     let balls = std::iter::repeat(0)
         .take(10)
@@ -94,7 +94,7 @@ fn main() {
         |mut query: Query| {
             query.get::<Position>().iter().for_each(|e| {
                 e.data.iter().for_each(|(entity, pos)| {
-                    println!("Entity: {:#?} at Position: {:#?}", entity, pos);
+                    //println!("Entity: {:#?} at Position: {:#?}", entity, pos);
                 });
             });
         },
