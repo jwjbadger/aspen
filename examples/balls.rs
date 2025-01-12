@@ -1,8 +1,8 @@
 use aspen::{
-    component::Component,
+    /*component::Component,*/
     entity::Entity,
     system::{Query, System},
-    World, WorldBuilder,
+    App, /*World,*/ WorldBuilder,
 };
 
 #[derive(Clone, Debug)]
@@ -20,7 +20,7 @@ struct Velocity {
 }
 
 fn main() {
-    let mut world = WorldBuilder::new().with_fixed_loop(60).graphical().build();
+    let mut world = WorldBuilder::new().with_frequency(60).build();
 
     let balls = std::iter::repeat(0)
         .take(10)
@@ -89,16 +89,6 @@ fn main() {
         },
     ));
 
-    world.add_fixed_system(System::new(
-        vec![std::any::TypeId::of::<Position>()],
-        |mut query: Query| {
-            query.get::<Position>().iter().for_each(|e| {
-                e.data.iter().for_each(|(entity, pos)| {
-                    //println!("Entity: {:#?} at Position: {:#?}", entity, pos);
-                });
-            });
-        },
-    ));
-
-    world.run();
+    let app = App::new(world);
+    app.run();
 }
