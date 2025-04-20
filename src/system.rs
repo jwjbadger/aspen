@@ -52,6 +52,11 @@ impl<'a> Query<'a> {
     }
 }
 
+pub trait SystemInterface {
+    fn execute(&mut self, query: Query);
+    fn components(&self) -> &HashSet<TypeId>;
+}
+
 pub struct System {
     pub components: HashSet<TypeId>,
     pub executable: fn(Query),
@@ -64,8 +69,40 @@ impl System {
             executable,
         }
     }
+}
 
-    pub fn execute(&self, query: Query) {
+impl SystemInterface for System {
+    fn execute(&mut self, query: Query) {
         (self.executable)(query)
+    }
+
+    fn components(&self) -> &HashSet<TypeId> {
+        &self.components
+    }
+}
+
+pub struct ResourcedSystem<T> {
+    pub components: HashSet<TypeId>,
+    pub executable: fn(Query, &T),
+    pub resource: T,
+}
+
+impl<T> ResourcedSystem<T> {
+    pub fn new(components: Vec<TypeId>, resource: T, executable: fn(Query, &T)) -> Self {
+        Self {
+            components: components.into_iter().collect(),
+            resource,
+            executable,
+        }
+    }
+}
+
+impl<T> SystemInterface for ResourcedSystem<T> {
+    fn execute(&mut self, query: Query) {
+        (self.executable)(query, &self.resource)
+    }
+
+    fn components(&self) -> &HashSet<TypeId> {
+        &self.components
     }
 }

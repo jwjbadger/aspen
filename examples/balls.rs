@@ -1,6 +1,7 @@
 use aspen::{
     /*component::Component,*/
     entity::Entity,
+    graphics::Mesh,
     system::{Query, System},
     App, /*World,*/ WorldBuilder,
 };
@@ -36,6 +37,8 @@ fn main() {
                 z: 0.0,
             },
         );
+
+        world.add_component(*ball, Mesh);
     });
 
     balls.iter().enumerate().for_each(|(index, ball)| {

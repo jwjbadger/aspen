@@ -1,7 +1,7 @@
 use std::sync::Arc;
 
 pub trait Renderer<'a> {
-    fn attach<T>(&mut self, item: T)
+    fn attach<T>(&mut self, item: &T)
     where
         T: Renderable;
     fn render(&mut self);
@@ -9,6 +9,10 @@ pub trait Renderer<'a> {
 }
 
 pub trait Renderable {}
+
+#[derive(Clone, Debug)]
+pub struct Mesh;
+impl Renderable for Mesh {}
 
 pub struct WgpuRenderer<'a> {
     surface: wgpu::Surface<'a>,
@@ -19,11 +23,11 @@ pub struct WgpuRenderer<'a> {
 }
 
 impl<'a> Renderer<'a> for WgpuRenderer<'a> {
-    fn attach<T>(&mut self, _item: T)
+    fn attach<T>(&mut self, _item: &T)
     where
         T: Renderable,
     {
-        todo!()
+        println!("attaching...")
     }
 
     fn render(&mut self) {
@@ -107,7 +111,8 @@ impl<'a> WgpuRenderer<'a> {
         let surface_format = surface_caps
             .formats
             .iter()
-            .find(|f| f.is_srgb()).copied()
+            .find(|f| f.is_srgb())
+            .copied()
             .unwrap_or(surface_caps.formats[0]);
         let config = wgpu::SurfaceConfiguration {
             usage: wgpu::TextureUsages::RENDER_ATTACHMENT,
@@ -116,7 +121,7 @@ impl<'a> WgpuRenderer<'a> {
             height: size.height,
             present_mode: surface_caps.present_modes[0],
             desired_maximum_frame_latency: 2,
-            alpha_mode: surface_caps.alpha_modes[0], 
+            alpha_mode: surface_caps.alpha_modes[0],
             view_formats: vec![],
         };
 
