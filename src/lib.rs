@@ -3,6 +3,7 @@ pub mod entity;
 pub mod graphics;
 pub mod os;
 pub mod system;
+pub mod mesh;
 
 pub use crate::{
     component::Component,

@@ -6,8 +6,9 @@ use winit::window::{Window, WindowId};
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    graphics::{Mesh, Renderer, WgpuRenderer},
+    graphics::{Renderer, WgpuRenderer},
     system::ResourcedSystem,
+    mesh::Mesh,
     World,
 };
 
@@ -56,7 +57,7 @@ impl<'a> ApplicationHandler for App<'a> {
             self.renderer.as_mut().unwrap().clone(),
             |mut query, renderer| {
                 query.get::<Mesh>().iter_mut().for_each(|e| {
-                    e.data.iter_mut().for_each(|(entity, mesh)| {
+                    e.data.iter_mut().for_each(|(_, mesh)| {
                         renderer.lock().unwrap().attach(mesh.as_ref());
                     })
                 });

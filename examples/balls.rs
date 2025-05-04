@@ -1,9 +1,9 @@
 use aspen::{
     /*component::Component,*/
     entity::Entity,
-    graphics::Mesh,
     system::{Query, System},
     App, /*World,*/ WorldBuilder,
+    mesh::{Mesh, Vertex}
 };
 
 #[derive(Clone, Debug)]
@@ -24,7 +24,7 @@ fn main() {
     let mut world = WorldBuilder::new().with_frequency(60).build();
 
     let balls = std::iter::repeat(0)
-        .take(10)
+        .take(1)
         .map(|_| world.new_entity())
         .collect::<Vec<Entity>>();
 
@@ -38,7 +38,16 @@ fn main() {
             },
         );
 
-        world.add_component(*ball, Mesh);
+        world.add_component(
+            *ball,
+            Mesh {
+                vertices: vec![
+                    Vertex { position: [0.0, 0.5, 0.0], color: [1.0, 0.0, 0.0] },
+                    Vertex { position: [-0.5, -0.5, 0.0], color: [0.0, 1.0, 0.0] },
+                    Vertex { position: [0.5, -0.5, 0.0], color: [0.0, 0.0, 1.0] },
+                ] 
+            },
+        );
     });
 
     balls.iter().enumerate().for_each(|(index, ball)| {
@@ -55,42 +64,42 @@ fn main() {
     });
 
     world.add_fixed_system(System::new(
-        vec![
+            vec![
             std::any::TypeId::of::<Position>(),
             std::any::TypeId::of::<Velocity>(),
-        ],
-        |mut query: Query| {
-            let mut new_position: std::collections::HashMap<Entity, Position> =
-                std::collections::HashMap::new();
+            ],
+            |mut query: Query| {
+                let mut new_position: std::collections::HashMap<Entity, Position> =
+                    std::collections::HashMap::new();
 
-            query.get::<Position>().iter_mut().for_each(|e| {
-                e.data.iter_mut().for_each(|(entity, pos)| {
-                    new_position.insert(
-                        entity.clone(),
-                        Position {
-                            x: pos.x,
-                            y: pos.y,
-                            z: pos.z,
-                        },
-                    );
-                });
-            });
-
-            query.get::<Velocity>().iter_mut().for_each(|e| {
-                e.data.iter_mut().for_each(|(entity, velocity)| {
-                    new_position.get_mut(entity).map(|pos| {
-                        pos.x += velocity.x / 60.0;
-                        pos.y += velocity.y / 60.0;
-                        pos.z += velocity.z / 60.0;
+                query.get::<Position>().iter_mut().for_each(|e| {
+                    e.data.iter_mut().for_each(|(entity, pos)| {
+                        new_position.insert(
+                            entity.clone(),
+                            Position {
+                                x: pos.x,
+                                y: pos.y,
+                                z: pos.z,
+                            },
+                        );
                     });
                 });
-            });
 
-            new_position
-                .drain()
-                .for_each(|(entity, new_pos)| query.set::<Position>(entity, new_pos))
-        },
-    ));
+                query.get::<Velocity>().iter_mut().for_each(|e| {
+                    e.data.iter_mut().for_each(|(entity, velocity)| {
+                        new_position.get_mut(entity).map(|pos| {
+                            pos.x += velocity.x / 60.0;
+                            pos.y += velocity.y / 60.0;
+                            pos.z += velocity.z / 60.0;
+                        });
+                    });
+                });
+
+                new_position
+                    .drain()
+                    .for_each(|(entity, new_pos)| query.set::<Position>(entity, new_pos))
+            },
+            ));
 
     let app = App::new(world);
     app.run();

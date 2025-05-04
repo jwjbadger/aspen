@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use crate::mesh::Vertex;
+use wgpu::util::DeviceExt;
 
 pub trait Renderer<'a> {
     fn attach<T>(&mut self, item: &T)
@@ -8,11 +10,9 @@ pub trait Renderer<'a> {
     fn resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>);
 }
 
-pub trait Renderable {}
-
-#[derive(Clone, Debug)]
-pub struct Mesh;
-impl Renderable for Mesh {}
+pub trait Renderable {
+    fn vertices(&self) -> Vec<Vertex>;
+}
 
 pub struct WgpuRenderer<'a> {
     surface: wgpu::Surface<'a>,
@@ -20,14 +20,23 @@ pub struct WgpuRenderer<'a> {
     render_pipeline: wgpu::RenderPipeline,
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
+    vertex_buffer: Option<wgpu::Buffer>,
 }
 
 impl<'a> Renderer<'a> for WgpuRenderer<'a> {
-    fn attach<T>(&mut self, _item: &T)
+    fn attach<T>(&mut self, item: &T)
     where
         T: Renderable,
     {
-        println!("attaching...")
+        if self.vertex_buffer.is_none() {
+            self.vertex_buffer = Some(
+                self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Vertex Buffer"),
+                    contents: bytemuck::cast_slice(&item.vertices()),
+                    usage: wgpu::BufferUsages::VERTEX,
+                }),
+            );
+        }
     }
 
     fn render(&mut self) {
@@ -49,7 +58,12 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                     view: &view,
                     resolve_target: None,
                     ops: wgpu::Operations {
-                        load: wgpu::LoadOp::Clear(wgpu::Color::GREEN),
+                        load: wgpu::LoadOp::Clear(wgpu::Color {
+                            r: 0.0,
+                            g: 0.5,
+                            b: 0.5,
+                            a: 1.0,
+                        }),
                         store: wgpu::StoreOp::Discard,
                     },
                 })],
@@ -57,6 +71,12 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
+
+            pass.set_pipeline(&self.render_pipeline);
+            if let Some(vertex_buffer) = &self.vertex_buffer {
+                pass.set_vertex_buffer(0, vertex_buffer.slice(..));
+                pass.draw(0..3, 0..1); // TODO: Use the actual vertex count
+            }
         }
 
         self.queue.submit(std::iter::once(command_encoder.finish()));
@@ -136,7 +156,7 @@ impl<'a> WgpuRenderer<'a> {
                     source: wgpu::ShaderSource::Wgsl(include_str!("shaders/shader.wgsl").into()),
                 }),
                 entry_point: Some("vs_main"),
-                buffers: &[],
+                buffers: &[Vertex::desc()],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -147,7 +167,7 @@ impl<'a> WgpuRenderer<'a> {
                 entry_point: Some("fs_main"),
                 compilation_options: Default::default(),
                 targets: &[Some(wgpu::ColorTargetState {
-                    format: wgpu::TextureFormat::Rgba8UnormSrgb,
+                    format: config.format,
                     blend: Some(wgpu::BlendState::REPLACE),
                     write_mask: wgpu::ColorWrites::ALL,
                 })],
@@ -176,6 +196,7 @@ impl<'a> WgpuRenderer<'a> {
             render_pipeline,
             queue,
             surface_config: config,
+            vertex_buffer: None,
         }
     }
 }
