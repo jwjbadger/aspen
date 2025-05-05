@@ -1,5 +1,8 @@
 use crate::graphics::Renderable;
 use bytemuck::NoUninit;
+use std::sync::atomic::{AtomicU32, Ordering};
+
+static MESHES: AtomicU32 = AtomicU32::new(0);
 
 #[derive(Clone, Debug)]
 pub struct Model {
@@ -18,20 +21,15 @@ pub struct MeshId(pub u32);
 #[derive(Clone, Debug)]
 pub struct Mesh {
     pub vertices: Vec<Vertex>,
-    pub(crate) id: Option<MeshId>,
+    pub(crate) id: MeshId,
 }
 
 impl Mesh {
     pub fn new(vertices: Vec<Vertex>) -> Self {
         Self {
             vertices,
-            id: None,
+            id: MeshId(MESHES.fetch_add(1, Ordering::SeqCst)),
         }
-    }
-
-    pub fn id(mut self, id: u32) -> Mesh {
-        self.id = Some(MeshId(id));
-        self
     }
 }
 

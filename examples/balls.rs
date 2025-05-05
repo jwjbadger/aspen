@@ -84,7 +84,7 @@ fn main() {
                             color: [0.0, 0.0, 1.0],
                         },
                     ]
-                }).id(index as u32),
+                }),
             },
         );
     });
@@ -127,6 +127,6 @@ fn main() {
         },
     ));
 
-    let app = App::new(world, 2);
+    let app = App::new(world);
     app.run();
 }

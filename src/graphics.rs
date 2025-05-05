@@ -22,19 +22,6 @@ pub struct WgpuRenderer<'a> {
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
     vertex_buffers: HashMap<MeshId, wgpu::Buffer>,
-    next_mesh: u32,
-}
-
-impl WgpuRenderer<'_> {
-    pub fn request_mesh(&mut self) -> Mesh {
-        let mesh = Mesh {
-            vertices: vec![],
-            id: Some(MeshId(self.next_mesh)),
-        };
-
-        self.next_mesh = self.next_mesh + 1;
-        mesh
-    }
 }
 
 impl<'a> Renderer<'a> for WgpuRenderer<'a> {
@@ -42,7 +29,7 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
     where
         T: Renderable,
     {
-        if self.vertex_buffers.get(&item.mesh().id.unwrap()).is_none() {
+        if self.vertex_buffers.get(&item.mesh().id).is_none() {
             let vertex_buffer = self
                 .device
                 .create_buffer_init(&wgpu::util::BufferInitDescriptor {
@@ -51,17 +38,8 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                     usage: wgpu::BufferUsages::VERTEX,
                 });
 
-            self.vertex_buffers.insert(item.mesh().id.unwrap(), vertex_buffer);
+            self.vertex_buffers.insert(item.mesh().id, vertex_buffer);
         }
-        /*if self.vertex_buffer.is_none() {
-            self.vertex_buffer = Some(
-                self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
-                    label: Some("Vertex Buffer"),
-                    contents: bytemuck::cast_slice(&item.vertices()),
-                    usage: wgpu::BufferUsages::VERTEX,
-                }),
-            );
-        }*/
     }
 
     fn render(&mut self) {
@@ -121,7 +99,7 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
 }
 
 impl<'a> WgpuRenderer<'a> {
-    pub async fn new(window: Arc<winit::window::Window>, next_mesh: u32) -> Self {
+    pub async fn new(window: Arc<winit::window::Window>) -> Self {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -225,7 +203,6 @@ impl<'a> WgpuRenderer<'a> {
             queue,
             surface_config: config,
             vertex_buffers: HashMap::new(),
-            next_mesh,
         }
     }
 }

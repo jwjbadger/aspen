@@ -20,17 +20,15 @@ where
     pub renderer: Option<Arc<Mutex<R>>>,
     pub world: World<'a>,
     phantom: std::marker::PhantomData<&'a R>,
-    init_mesh: u32
 }
 
 impl<'a> App<'a> {
-    pub fn new(world: World<'a>, init_mesh: u32) -> Self {
+    pub fn new(world: World<'a>) -> Self {
         Self {
             window: None,
             world,
             renderer: None,
             phantom: std::marker::PhantomData,
-            init_mesh
         }
     }
 
@@ -51,7 +49,7 @@ impl<'a> ApplicationHandler for App<'a> {
         ));
 
         self.renderer = Some(Arc::new(Mutex::new(futures::executor::block_on(
-            WgpuRenderer::new(self.window.clone().unwrap(), self.init_mesh),
+            WgpuRenderer::new(self.window.clone().unwrap()),
         ))));
 
         self.world.add_dependent_system(ResourcedSystem::new(
