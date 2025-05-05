@@ -6,29 +6,31 @@ use winit::window::{Window, WindowId};
 use std::sync::{Arc, Mutex};
 
 use crate::{
+    camera::Camera,
     graphics::{Renderer, WgpuRenderer},
     mesh::Model,
     system::ResourcedSystem,
     World,
 };
 
-pub struct App<'a, R = WgpuRenderer<'a>>
+pub struct App<'a, C, R = WgpuRenderer<'a>>
 where
     R: Renderer<'a>,
+    C: Camera + 'a,
 {
     window: Option<Arc<Window>>,
     pub renderer: Option<Arc<Mutex<R>>>,
     pub world: World<'a>,
-    phantom: std::marker::PhantomData<&'a R>,
+    camera: Option<C>,
 }
 
-impl<'a> App<'a> {
-    pub fn new(world: World<'a>) -> Self {
+impl<'a, C: Camera + 'a> App<'a, C> {
+    pub fn new(world: World<'a>, camera: C) -> Self {
         Self {
             window: None,
             world,
             renderer: None,
-            phantom: std::marker::PhantomData,
+            camera: Some(camera),
         }
     }
 
@@ -40,7 +42,7 @@ impl<'a> App<'a> {
     }
 }
 
-impl<'a> ApplicationHandler for App<'a> {
+impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
         self.window = Some(Arc::new(
             event_loop
@@ -48,8 +50,14 @@ impl<'a> ApplicationHandler for App<'a> {
                 .unwrap(),
         ));
 
+        let size = self.window.as_ref().unwrap().inner_size();
+        self.camera
+            .as_mut()
+            .expect("no camera")
+            .resize(size.width as f32, size.height as f32);
+
         self.renderer = Some(Arc::new(Mutex::new(futures::executor::block_on(
-            WgpuRenderer::new(self.window.clone().unwrap()),
+            WgpuRenderer::new(self.window.clone().unwrap(), self.camera.take().unwrap()),
         ))));
 
         self.world.add_dependent_system(ResourcedSystem::new(

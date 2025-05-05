@@ -1,7 +1,8 @@
 use aspen::{
+    camera::FpvCamera,
     /*component::Component,*/
     entity::Entity,
-    mesh::{Mesh, Vertex, Model},
+    mesh::{Mesh, Model, Vertex},
     system::{Query, System},
     App, /*World,*/ WorldBuilder,
 };
@@ -127,6 +128,15 @@ fn main() {
         },
     ));
 
-    let app = App::new(world);
+    let app = App::new(
+        world,
+        FpvCamera {
+            eye: nalgebra::Point3::new(0.0, 1.0, 2.0),
+            target: nalgebra::Point3::new(0.0, 0.0, 0.0),
+            up: nalgebra::Vector3::y(),
+            fovy: 45.0,
+            ..Default::default()
+        },
+    );
     app.run();
 }

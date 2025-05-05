@@ -1,3 +1,4 @@
+pub mod camera;
 pub mod component;
 pub mod entity;
 pub mod graphics;
