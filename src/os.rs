@@ -7,8 +7,8 @@ use std::sync::{Arc, Mutex};
 
 use crate::{
     graphics::{Renderer, WgpuRenderer},
+    mesh::Model,
     system::ResourcedSystem,
-    mesh::Mesh,
     World,
 };
 
@@ -20,15 +20,17 @@ where
     pub renderer: Option<Arc<Mutex<R>>>,
     pub world: World<'a>,
     phantom: std::marker::PhantomData<&'a R>,
+    init_mesh: u32
 }
 
 impl<'a> App<'a> {
-    pub fn new(world: World<'a>) -> Self {
+    pub fn new(world: World<'a>, init_mesh: u32) -> Self {
         Self {
             window: None,
             world,
             renderer: None,
             phantom: std::marker::PhantomData,
+            init_mesh
         }
     }
 
@@ -49,16 +51,16 @@ impl<'a> ApplicationHandler for App<'a> {
         ));
 
         self.renderer = Some(Arc::new(Mutex::new(futures::executor::block_on(
-            WgpuRenderer::new(self.window.clone().unwrap()),
+            WgpuRenderer::new(self.window.clone().unwrap(), self.init_mesh),
         ))));
 
         self.world.add_dependent_system(ResourcedSystem::new(
-            vec![std::any::TypeId::of::<Mesh>()],
+            vec![std::any::TypeId::of::<Model>()],
             self.renderer.as_mut().unwrap().clone(),
             |mut query, renderer| {
-                query.get::<Mesh>().iter_mut().for_each(|e| {
-                    e.data.iter_mut().for_each(|(_, mesh)| {
-                        renderer.lock().unwrap().attach(mesh.as_ref());
+                query.get::<Model>().iter_mut().for_each(|e| {
+                    e.data.iter_mut().for_each(|(_, model)| {
+                        renderer.lock().unwrap().attach(model.as_ref());
                     })
                 });
             },

@@ -1,5 +1,6 @@
+use crate::mesh::{Mesh, MeshId, Vertex};
+use std::collections::HashMap;
 use std::sync::Arc;
-use crate::mesh::Vertex;
 use wgpu::util::DeviceExt;
 
 pub trait Renderer<'a> {
@@ -11,7 +12,7 @@ pub trait Renderer<'a> {
 }
 
 pub trait Renderable {
-    fn vertices(&self) -> Vec<Vertex>;
+    fn mesh(&self) -> &Mesh;
 }
 
 pub struct WgpuRenderer<'a> {
@@ -20,7 +21,20 @@ pub struct WgpuRenderer<'a> {
     render_pipeline: wgpu::RenderPipeline,
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
-    vertex_buffer: Option<wgpu::Buffer>,
+    vertex_buffers: HashMap<MeshId, wgpu::Buffer>,
+    next_mesh: u32,
+}
+
+impl WgpuRenderer<'_> {
+    pub fn request_mesh(&mut self) -> Mesh {
+        let mesh = Mesh {
+            vertices: vec![],
+            id: Some(MeshId(self.next_mesh)),
+        };
+
+        self.next_mesh = self.next_mesh + 1;
+        mesh
+    }
 }
 
 impl<'a> Renderer<'a> for WgpuRenderer<'a> {
@@ -28,7 +42,18 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
     where
         T: Renderable,
     {
-        if self.vertex_buffer.is_none() {
+        if self.vertex_buffers.get(&item.mesh().id.unwrap()).is_none() {
+            let vertex_buffer = self
+                .device
+                .create_buffer_init(&wgpu::util::BufferInitDescriptor {
+                    label: Some("Vertex Buffer"),
+                    contents: bytemuck::cast_slice(&item.mesh().vertices),
+                    usage: wgpu::BufferUsages::VERTEX,
+                });
+
+            self.vertex_buffers.insert(item.mesh().id.unwrap(), vertex_buffer);
+        }
+        /*if self.vertex_buffer.is_none() {
             self.vertex_buffer = Some(
                 self.device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
                     label: Some("Vertex Buffer"),
@@ -36,7 +61,7 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                     usage: wgpu::BufferUsages::VERTEX,
                 }),
             );
-        }
+        }*/
     }
 
     fn render(&mut self) {
@@ -73,10 +98,13 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
             });
 
             pass.set_pipeline(&self.render_pipeline);
-            if let Some(vertex_buffer) = &self.vertex_buffer {
+
+            for vertex_buffer in self.vertex_buffers.values() {
                 pass.set_vertex_buffer(0, vertex_buffer.slice(..));
                 pass.draw(0..3, 0..1); // TODO: Use the actual vertex count
             }
+
+            self.vertex_buffers.clear();
         }
 
         self.queue.submit(std::iter::once(command_encoder.finish()));
@@ -93,7 +121,7 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
 }
 
 impl<'a> WgpuRenderer<'a> {
-    pub async fn new(window: Arc<winit::window::Window>) -> Self {
+    pub async fn new(window: Arc<winit::window::Window>, next_mesh: u32) -> Self {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -196,7 +224,8 @@ impl<'a> WgpuRenderer<'a> {
             render_pipeline,
             queue,
             surface_config: config,
-            vertex_buffer: None,
+            vertex_buffers: HashMap::new(),
+            next_mesh,
         }
     }
 }
