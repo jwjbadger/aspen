@@ -3,13 +3,15 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
-use std::sync::{Arc, Mutex};
+use std::{collections::{HashSet, HashMap}, sync::{Arc, Mutex}};
 
 use crate::{
     camera::Camera,
     graphics::{Renderer, WgpuRenderer},
     mesh::Model,
     system::ResourcedSystem,
+    input::InputManager,
+    entity::Entity,
     World,
 };
 
@@ -21,6 +23,7 @@ where
     window: Option<Arc<Window>>,
     pub renderer: Option<Arc<Mutex<R>>>,
     pub world: World<'a>,
+    keys: Arc<Mutex<HashSet<winit::keyboard::PhysicalKey>>>,
     camera: Option<C>,
 }
 
@@ -31,6 +34,7 @@ impl<'a, C: Camera + 'a> App<'a, C> {
             world,
             renderer: None,
             camera: Some(camera),
+            keys: Arc::new(Mutex::new(HashSet::new())),
         }
     }
 
@@ -71,6 +75,24 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
                 });
             },
         ));
+
+        self.world.add_fixed_system(ResourcedSystem::new(
+            vec![std::any::TypeId::of::<InputManager>()],
+            self.keys.clone(),
+            |mut query, keys| {
+                let mut new_keys = HashMap::<Entity, InputManager>::new();
+                
+                query.get::<InputManager>().iter_mut().for_each(|e| {
+                    e.data.iter_mut().for_each(|(entity, input_manager)| {
+                        new_keys.insert(entity.clone(), InputManager { keys: keys.lock().unwrap().clone() });
+                    })
+                });
+                
+                new_keys.drain().for_each(|(entity, input_manager)| {
+                    query.set::<InputManager>(entity, input_manager);
+                });
+            },
+        ));
     }
 
     fn window_event(&mut self, event_loop: &ActiveEventLoop, _id: WindowId, event: WindowEvent) {
@@ -93,6 +115,15 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
                     .lock()
                     .unwrap()
                     .resize(physical_size);
+            }
+            WindowEvent::KeyboardInput {device_id, event, is_synthetic} => {
+                if !is_synthetic && !event.repeat {
+                    if event.state == winit::event::ElementState::Pressed {
+                        self.keys.lock().unwrap().insert(event.physical_key);
+                    } else if event.state == winit::event::ElementState::Released {
+                        self.keys.lock().unwrap().remove(&event.physical_key);
+                    }
+                }
             }
             _ => (),
         }

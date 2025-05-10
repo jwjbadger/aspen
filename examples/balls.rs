@@ -3,9 +3,12 @@ use aspen::{
     /*component::Component,*/
     entity::Entity,
     mesh::{Mesh, Model, Vertex},
+    input::InputManager,
     system::{Query, System},
     App, /*World,*/ WorldBuilder,
 };
+
+use std::collections::HashSet;
 
 #[derive(Clone, Debug)]
 struct Position {
@@ -39,6 +42,14 @@ fn main() {
             },
         );
     });
+
+    let input_manager = world.new_entity();
+    world.add_component(
+        input_manager,
+        InputManager {
+            keys: HashSet::new(),
+        }
+    );
 
     balls.iter().enumerate().for_each(|(index, ball)| {
         if index < 5 {
@@ -78,17 +89,28 @@ fn main() {
                         },
                         Vertex {
                             position: [0.5, -0.5, 0.0],
-                            color: [0.0, 1.0, 0.0],
+                            color: [0.0, 0.0, 1.0],
                         },
                         Vertex {
                             position: [0.5, 0.5, 0.0],
-                            color: [0.0, 0.0, 1.0],
+                            color: [0.0, 1.0, 0.0],
                         },
                     ]
                 }),
             },
         );
     });
+
+    world.add_fixed_system(System::new(
+        vec![std::any::TypeId::of::<InputManager>()],
+        |mut query: Query| {
+            query.get::<InputManager>().iter_mut().for_each(|e| {
+                e.data.iter_mut().for_each(|(entity, input)| {
+                    println!("{:?}", input);
+                });
+            });
+        },
+    ));
 
     world.add_fixed_system(System::new(
         vec![
@@ -131,7 +153,7 @@ fn main() {
     let app = App::new(
         world,
         FpvCamera {
-            eye: nalgebra::Point3::new(0.0, 1.0, 2.0),
+            eye: nalgebra::Point3::new(2.0, 3.0, 4.0),
             target: nalgebra::Point3::new(0.0, 0.0, 0.0),
             up: nalgebra::Vector3::y(),
             fovy: 45.0,

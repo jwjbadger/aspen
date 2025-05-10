@@ -76,7 +76,7 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                             b: 0.5,
                             a: 1.0,
                         }),
-                        store: wgpu::StoreOp::Discard,
+                        store: wgpu::StoreOp::Store,
                     },
                 })],
                 depth_stencil_attachment: None,
