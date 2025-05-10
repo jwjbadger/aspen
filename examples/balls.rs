@@ -1,14 +1,18 @@
 use aspen::{
+    camera::Camera,
     camera::FpvCamera,
     /*component::Component,*/
     entity::Entity,
-    mesh::{Mesh, Model, Vertex},
     input::InputManager,
+    mesh::{Mesh, Model, Vertex},
     system::{Query, System},
     App, /*World,*/ WorldBuilder,
 };
 
 use std::collections::HashSet;
+use std::sync::{Arc, Mutex};
+
+use winit::keyboard::KeyCode;
 
 #[derive(Clone, Debug)]
 struct Position {
@@ -48,8 +52,18 @@ fn main() {
         input_manager,
         InputManager {
             keys: HashSet::new(),
-        }
+        },
     );
+
+    let camera = Arc::new(Mutex::new(FpvCamera {
+        eye: nalgebra::Point3::new(2.0, 3.0, 4.0),
+        target: nalgebra::Point3::new(0.0, 0.0, 0.0),
+        up: nalgebra::Vector3::y(),
+        fovy: 45.0,
+        ..Default::default()
+    }));
+
+    world.add_component(input_manager, camera.clone());
 
     balls.iter().enumerate().for_each(|(index, ball)| {
         if index < 5 {
@@ -102,12 +116,45 @@ fn main() {
     });
 
     world.add_fixed_system(System::new(
-        vec![std::any::TypeId::of::<InputManager>()],
+        vec![
+            std::any::TypeId::of::<InputManager>(),
+            std::any::TypeId::of::<Arc<Mutex<FpvCamera>>>(),
+        ],
         |mut query: Query| {
+            let mut keys = Vec::new();
+
             query.get::<InputManager>().iter_mut().for_each(|e| {
                 e.data.iter_mut().for_each(|(entity, input)| {
-                    println!("{:?}", input);
+                    input.keys.iter().for_each(|key| {
+                        keys.push(key.clone());
+                    });
                 });
+            });
+
+            keys.into_iter().for_each(|key| {
+                query
+                    .get::<Arc<Mutex<FpvCamera>>>()
+                    .iter_mut()
+                    .for_each(|e| {
+                        e.data.iter_mut().for_each(|(entity, camera)| {
+                            if let winit::keyboard::PhysicalKey::Code(code) = key {
+                                let mut camera = camera.lock().unwrap();
+
+                                let t = nalgebra::Isometry3::new(
+                                    match code {
+                                        KeyCode::KeyW => (camera.target - camera.eye),
+                                        KeyCode::KeyS => -1.0 * (camera.target - camera.eye),
+                                        KeyCode::KeyA => -1.0 * (camera.target - camera.eye).cross(&camera.up),
+                                        KeyCode::KeyD => (camera.target - camera.eye).cross(&camera.up),
+                                        _ => nalgebra::Vector3::zeros(),                      
+                                    }.normalize() * 0.01,
+                                    nalgebra::Vector3::new(0.0, 0.0, 0.0),
+                                );
+
+                                camera.eye = t * camera.eye;
+                            }
+                        });
+                    });
             });
         },
     ));
@@ -150,15 +197,6 @@ fn main() {
         },
     ));
 
-    let app = App::new(
-        world,
-        FpvCamera {
-            eye: nalgebra::Point3::new(2.0, 3.0, 4.0),
-            target: nalgebra::Point3::new(0.0, 0.0, 0.0),
-            up: nalgebra::Vector3::y(),
-            fovy: 45.0,
-            ..Default::default()
-        },
-    );
+    let app = App::new(world, camera);
     app.run();
 }

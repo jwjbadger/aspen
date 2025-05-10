@@ -34,7 +34,7 @@ pub trait Camera {
     fn resize(&mut self, width: f32, height: f32);
     fn build_view_projection_matrix(&self) -> nalgebra::Matrix4<f32>;
 }
-
+#[derive(Debug, Clone)]
 pub struct FpvCamera {
     pub eye: nalgebra::Point3<f32>,
     pub target: nalgebra::Point3<f32>,

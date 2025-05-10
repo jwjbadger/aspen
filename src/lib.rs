@@ -1,8 +1,8 @@
 pub mod camera;
-pub mod input;
 pub mod component;
 pub mod entity;
 pub mod graphics;
+pub mod input;
 pub mod mesh;
 pub mod os;
 pub mod system;

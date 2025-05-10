@@ -3,7 +3,7 @@ use crate::{
     mesh::{Mesh, MeshId, Vertex},
 };
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use wgpu::util::DeviceExt;
 
 pub trait Renderer<'a> {
@@ -25,7 +25,7 @@ pub struct WgpuRenderer<'a> {
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
     vertex_buffers: HashMap<MeshId, wgpu::Buffer>,
-    camera: Box<dyn Camera + 'a>,
+    camera: Arc<Mutex<dyn Camera + 'a>>,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
     camera_bind_group: wgpu::BindGroup,
@@ -50,7 +50,13 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
     }
 
     fn render(&mut self) {
-        self.queue.write_buffer(&self.camera_buffer, 0, bytemuck::cast_slice(&[self.camera_uniform]));
+        self.camera_uniform
+            .update_raw(self.camera.lock().unwrap().build_view_projection_matrix());
+        self.queue.write_buffer(
+            &self.camera_buffer,
+            0,
+            bytemuck::cast_slice(&[self.camera_uniform]),
+        );
 
         let current_texture = self.surface.get_current_texture().unwrap();
         let view = current_texture
@@ -104,19 +110,21 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
         self.surface_config.width = physical_size.width;
         self.surface_config.height = physical_size.height;
 
-        self.camera.resize(
-            physical_size.width as f32,
-            physical_size.height as f32,
-        );
+        let mut camera = self.camera.lock().unwrap();
+        camera.resize(physical_size.width as f32, physical_size.height as f32);
 
-        self.camera_uniform.update_raw(self.camera.build_view_projection_matrix());
+        self.camera_uniform
+            .update_raw(camera.build_view_projection_matrix());
 
         self.surface.configure(&self.device, &self.surface_config);
     }
 }
 
 impl<'a> WgpuRenderer<'a> {
-    pub async fn new(window: Arc<winit::window::Window>, camera: impl Camera + 'a) -> Self {
+    pub async fn new(
+        window: Arc<winit::window::Window>,
+        camera: Arc<Mutex<impl Camera + 'a>>,
+    ) -> Self {
         let size = window.inner_size();
 
         let instance = wgpu::Instance::new(wgpu::InstanceDescriptor {
@@ -171,7 +179,7 @@ impl<'a> WgpuRenderer<'a> {
         surface.configure(&device, &config);
 
         let mut camera_uniform = CameraUniform::new();
-        camera_uniform.update(&camera);
+        camera_uniform.update(&(*camera.lock().unwrap()));
 
         let camera_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
             label: Some("Camera Buffer"),
@@ -203,11 +211,12 @@ impl<'a> WgpuRenderer<'a> {
             }],
         });
 
-        let render_pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-            label: Some("Aspen Pipeline Layout"),
-            bind_group_layouts: &[&camera_bind_group_layout],
-            push_constant_ranges: &[],
-        });
+        let render_pipeline_layout =
+            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                label: Some("Aspen Pipeline Layout"),
+                bind_group_layouts: &[&camera_bind_group_layout],
+                push_constant_ranges: &[],
+            });
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             label: Some("Aspen Render Pipeline"),
@@ -259,7 +268,7 @@ impl<'a> WgpuRenderer<'a> {
             queue,
             surface_config: config,
             vertex_buffers: HashMap::new(),
-            camera: Box::new(camera),
+            camera,
             camera_buffer,
             camera_uniform,
             camera_bind_group,

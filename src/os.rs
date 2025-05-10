@@ -3,15 +3,18 @@ use winit::event::WindowEvent;
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
-use std::{collections::{HashSet, HashMap}, sync::{Arc, Mutex}};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::{Arc, Mutex},
+};
 
 use crate::{
     camera::Camera,
+    entity::Entity,
     graphics::{Renderer, WgpuRenderer},
+    input::InputManager,
     mesh::Model,
     system::ResourcedSystem,
-    input::InputManager,
-    entity::Entity,
     World,
 };
 
@@ -24,16 +27,16 @@ where
     pub renderer: Option<Arc<Mutex<R>>>,
     pub world: World<'a>,
     keys: Arc<Mutex<HashSet<winit::keyboard::PhysicalKey>>>,
-    camera: Option<C>,
+    camera: Arc<Mutex<C>>,
 }
 
 impl<'a, C: Camera + 'a> App<'a, C> {
-    pub fn new(world: World<'a>, camera: C) -> Self {
+    pub fn new(world: World<'a>, camera: Arc<Mutex<C>>) -> Self {
         Self {
             window: None,
             world,
             renderer: None,
-            camera: Some(camera),
+            camera,
             keys: Arc::new(Mutex::new(HashSet::new())),
         }
     }
@@ -56,12 +59,12 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
 
         let size = self.window.as_ref().unwrap().inner_size();
         self.camera
-            .as_mut()
-            .expect("no camera")
+            .lock()
+            .expect("no camera access")
             .resize(size.width as f32, size.height as f32);
 
         self.renderer = Some(Arc::new(Mutex::new(futures::executor::block_on(
-            WgpuRenderer::new(self.window.clone().unwrap(), self.camera.take().unwrap()),
+            WgpuRenderer::new(self.window.clone().unwrap(), self.camera.clone()),
         ))));
 
         self.world.add_dependent_system(ResourcedSystem::new(
@@ -81,13 +84,18 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             self.keys.clone(),
             |mut query, keys| {
                 let mut new_keys = HashMap::<Entity, InputManager>::new();
-                
+
                 query.get::<InputManager>().iter_mut().for_each(|e| {
-                    e.data.iter_mut().for_each(|(entity, input_manager)| {
-                        new_keys.insert(entity.clone(), InputManager { keys: keys.lock().unwrap().clone() });
+                    e.data.iter_mut().for_each(|(entity, _)| {
+                        new_keys.insert(
+                            entity.clone(),
+                            InputManager {
+                                keys: keys.lock().unwrap().clone(),
+                            },
+                        );
                     })
                 });
-                
+
                 new_keys.drain().for_each(|(entity, input_manager)| {
                     query.set::<InputManager>(entity, input_manager);
                 });
@@ -116,7 +124,11 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
                     .unwrap()
                     .resize(physical_size);
             }
-            WindowEvent::KeyboardInput {device_id, event, is_synthetic} => {
+            WindowEvent::KeyboardInput {
+                device_id: _,
+                event,
+                is_synthetic,
+            } => {
                 if !is_synthetic && !event.repeat {
                     if event.state == winit::event::ElementState::Pressed {
                         self.keys.lock().unwrap().insert(event.physical_key);
