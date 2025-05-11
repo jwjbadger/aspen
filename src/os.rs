@@ -13,7 +13,7 @@ use crate::{
     entity::Entity,
     graphics::{Renderer, WgpuRenderer},
     input::InputManager,
-    mesh::Model,
+    mesh::{Model, Instance},
     system::ResourcedSystem,
     World,
 };
@@ -68,13 +68,26 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
         ))));
 
         self.world.add_dependent_system(ResourcedSystem::new(
-            vec![std::any::TypeId::of::<Model>()],
+            vec![std::any::TypeId::of::<Model>(), std::any::TypeId::of::<Instance>()],
             self.renderer.as_mut().unwrap().clone(),
             |mut query, renderer| {
+                let mut models = Vec::new();
+                let mut instances = Vec::new();
+
                 query.get::<Model>().iter_mut().for_each(|e| {
                     e.data.iter_mut().for_each(|(_, model)| {
-                        renderer.lock().unwrap().attach(model.as_ref());
+                        models.push(model.clone());
                     })
+                });
+
+                query.get::<Instance>().iter_mut().for_each(|e| {
+                    e.data.iter_mut().for_each(|(_, instance)| {
+                        instances.push(instance.clone()); // TODO: don't clone
+                    })
+                });
+
+                models.into_iter().zip(instances.drain(..)).for_each(|(model, instance)| {
+                    renderer.lock().unwrap().attach(model.as_ref(), instance.as_ref().clone());
                 });
             },
         ));

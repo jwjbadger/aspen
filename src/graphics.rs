@@ -1,13 +1,13 @@
 use crate::{
     camera::{Camera, CameraUniform},
-    mesh::{Mesh, MeshId, MeshInfo, Vertex},
+    mesh::{Mesh, MeshId, MeshInfo, Vertex, Instance, InstanceRaw, InstanceInfo},
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use wgpu::util::DeviceExt;
 
 pub trait Renderer<'a> {
-    fn attach<T>(&mut self, item: &T)
+    fn attach<T>(&mut self, item: &T, instance: Instance)
     where
         T: Renderable;
     fn render(&mut self);
@@ -25,6 +25,7 @@ pub struct WgpuRenderer<'a> {
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
     vertex_buffers: HashMap<MeshId, MeshInfo>,
+    instances: HashMap<MeshId, InstanceInfo>,
     camera: Arc<Mutex<dyn Camera + 'a>>,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
@@ -32,7 +33,7 @@ pub struct WgpuRenderer<'a> {
 }
 
 impl<'a> Renderer<'a> for WgpuRenderer<'a> {
-    fn attach<T>(&mut self, item: &T)
+    fn attach<T>(&mut self, item: &T, instance: Instance)
     where
         T: Renderable,
     {
@@ -52,6 +53,18 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                     vertex_buffer,
                 },
             );
+        }
+
+        if self.instances.get(&item.mesh().id).is_none() {
+            self.instances.insert(
+                item.mesh().id,
+                InstanceInfo::new(&self.device, vec![instance]),
+            );
+        } else if !self.instances.get(&item.mesh().id).unwrap().contains(instance.id) {
+            self.instances
+                .get_mut(&item.mesh().id)
+                .unwrap()
+                .append(&self.device, instance);
         }
     }
 
@@ -99,9 +112,19 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
             pass.set_pipeline(&self.render_pipeline);
             pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
-            for info in self.vertex_buffers.values() {
-                pass.set_vertex_buffer(0, info.vertex_buffer.slice(..));
-                pass.draw(0..info.vertex_count, 0..1); // TODO: Use the actual vertex count
+            for mesh in self.instances.keys() {
+                let mesh_info = self
+                    .vertex_buffers
+                    .get(mesh)
+                    .expect("Mesh not found");
+                let instance_info = self
+                    .instances
+                    .get(mesh)
+                    .expect("Instance not found");
+
+                pass.set_vertex_buffer(0, mesh_info.vertex_buffer.slice(..));
+                pass.set_vertex_buffer(1, instance_info.instance_buffer.slice(..));
+                pass.draw(0..mesh_info.vertex_count, 0..instance_info.instance_count as u32); // TODO: Use the actual vertex count
             }
 
             self.vertex_buffers.clear();
@@ -233,7 +256,7 @@ impl<'a> WgpuRenderer<'a> {
                     source: wgpu::ShaderSource::Wgsl(include_str!("shaders/shader.wgsl").into()),
                 }),
                 entry_point: Some("vs_main"),
-                buffers: &[Vertex::desc()],
+                buffers: &[Vertex::desc(), InstanceRaw::desc()],
                 compilation_options: Default::default(),
             },
             fragment: Some(wgpu::FragmentState {
@@ -274,6 +297,7 @@ impl<'a> WgpuRenderer<'a> {
             queue,
             surface_config: config,
             vertex_buffers: HashMap::new(),
+            instances: HashMap::new(),
             camera,
             camera_buffer,
             camera_uniform,

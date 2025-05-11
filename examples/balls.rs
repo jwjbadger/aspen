@@ -4,7 +4,7 @@ use aspen::{
     /*component::Component,*/
     entity::Entity,
     input::InputManager,
-    mesh::{Mesh, Model, Vertex},
+    mesh::{Mesh, Model, Vertex, Instance},
     system::{Query, System},
     App, /*World,*/ WorldBuilder,
 };
@@ -13,13 +13,6 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use winit::keyboard::KeyCode;
-
-#[derive(Clone, Debug)]
-struct Position {
-    x: f32,
-    y: f32,
-    z: f32,
-}
 
 #[derive(Clone, Debug)]
 struct Velocity {
@@ -32,19 +25,13 @@ fn main() {
     let mut world = WorldBuilder::new().with_frequency(60).build();
 
     let balls = std::iter::repeat(0)
-        .take(2)
+        .take(10)
         .map(|_| world.new_entity())
         .collect::<Vec<Entity>>();
 
+    let sphere_model = Model::from_obj("sphere.obj");
     balls.iter().for_each(|ball| {
-        world.add_component(
-            *ball,
-            Position {
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-        );
+        world.add_component(*ball, sphere_model.clone());
     });
 
     let input_manager = world.new_entity();
@@ -77,7 +64,14 @@ fn main() {
             )
         }
 
-        world.add_component(*ball, Model::from_obj("sphere.obj"));
+        world.add_component(
+            *ball,
+            Instance::new(&sphere_model.mesh).with_transform(
+                nalgebra::Translation3::from(
+                    nalgebra::Vector3::new(3.0 * index as f32, 0.0, 0.0),
+                ),
+            ),
+        );
     });
 
     world.add_fixed_system(System::new(
@@ -131,43 +125,43 @@ fn main() {
         },
     ));
 
-    world.add_fixed_system(System::new(
+    /*world.add_fixed_system(System::new(
         vec![
-            std::any::TypeId::of::<Position>(),
+            std::any::TypeId::of::<Instance>(),
             std::any::TypeId::of::<Velocity>(),
         ],
         |mut query: Query| {
-            let mut new_position: std::collections::HashMap<Entity, Position> =
+            let mut new_transform: std::collections::HashMap<Entity, Instance> =
                 std::collections::HashMap::new();
 
-            query.get::<Position>().iter_mut().for_each(|e| {
-                e.data.iter_mut().for_each(|(entity, pos)| {
+            query.get::<Transform>().iter_mut().for_each(|e| {
+                e.data.iter_mut().for_each(|(entity, trans)| {
                     new_position.insert(
                         entity.clone(),
-                        Position {
-                            x: pos.x,
-                            y: pos.y,
-                            z: pos.z,
-                        },
+                        Transform {
+                            position: trans.position.clone(),
+                            scale: trans.scale.clone(),
+                            rotation: trans.rotation.clone(),
+                        }
                     );
                 });
             });
 
             query.get::<Velocity>().iter_mut().for_each(|e| {
                 e.data.iter_mut().for_each(|(entity, velocity)| {
-                    new_position.get_mut(entity).map(|pos| {
-                        pos.x += velocity.x / 60.0;
-                        pos.y += velocity.y / 60.0;
-                        pos.z += velocity.z / 60.0;
+                    new_transform.get_mut(entity).map(|trans| {
+                        trans.position.x += velocity.x / 60.0;
+                        trans.position.y += velocity.y / 60.0;
+                        trans.position.z += velocity.z / 60.0;
                     });
                 });
             });
 
-            new_position
+            new_transform
                 .drain()
-                .for_each(|(entity, new_pos)| query.set::<Position>(entity, new_pos))
+                .for_each(|(entity, new_trans)| query.set::<Transform>(entity, new_trans))
         },
-    ));
+    ));*/
 
     let app = App::new(world, camera);
     app.run();

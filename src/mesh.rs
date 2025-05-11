@@ -1,9 +1,138 @@
 use crate::graphics::Renderable;
 use bytemuck::NoUninit;
-use std::sync::atomic::{AtomicU32, Ordering};
 use std::io::{BufReader, Cursor};
+use std::sync::atomic::{AtomicU32, Ordering};
+use wgpu::util::DeviceExt;
 
 static MESHES: AtomicU32 = AtomicU32::new(0);
+static INSTANCES: AtomicU32 = AtomicU32::new(0);
+
+#[repr(C)]
+#[derive(Copy, Clone, bytemuck::Pod, bytemuck::Zeroable)]
+pub(crate) struct InstanceRaw {
+    model: [[f32; 4]; 4],
+}
+
+impl InstanceRaw {
+    pub(crate) fn desc() -> wgpu::VertexBufferLayout<'static> {
+        use std::mem;
+        wgpu::VertexBufferLayout {
+            array_stride: mem::size_of::<InstanceRaw>() as wgpu::BufferAddress,
+            step_mode: wgpu::VertexStepMode::Instance,
+            attributes: &[
+                wgpu::VertexAttribute {
+                    offset: 0,
+                    shader_location: 5,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 4]>() as wgpu::BufferAddress,
+                    shader_location: 6,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 8]>() as wgpu::BufferAddress,
+                    shader_location: 7,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+                wgpu::VertexAttribute {
+                    offset: mem::size_of::<[f32; 12]>() as wgpu::BufferAddress,
+                    shader_location: 8,
+                    format: wgpu::VertexFormat::Float32x4,
+                },
+            ],
+        }
+    }
+}
+
+pub(crate) struct InstanceInfo {
+    pub(crate) instance_buffer: wgpu::Buffer,
+    pub(crate) instance_buffer_size: usize,
+    pub(crate) instance_count: usize,
+    instances: Vec<Instance>,
+}
+
+impl InstanceInfo {
+    pub(crate) fn new(device: &wgpu::Device, instances: Vec<Instance>) -> Self {
+        let instance_count = instances.len();
+
+        let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let instance_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: bytemuck::cast_slice(&instance_data),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+
+        Self {
+            instance_buffer,
+            instance_buffer_size: instance_count, // TODO: vec-like resizing
+            instance_count: instance_count,
+            instances: instances, 
+        }
+    }
+
+    pub(crate) fn append(
+        &mut self,
+        device: &wgpu::Device,
+        instance: Instance,
+    ) {
+        self.instances.push(instance);
+        let instance_data = self.instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+
+        let instance_buffer = device.create_buffer_init(
+            &wgpu::util::BufferInitDescriptor {
+                label: Some("Instance Buffer"),
+                contents: bytemuck::cast_slice(&instance_data),
+                usage: wgpu::BufferUsages::VERTEX,
+            }
+        );
+
+        // TODO: destroy?
+
+        self.instance_buffer = instance_buffer;
+        self.instance_count += 1;
+        self.instance_buffer_size += 1;
+    }
+
+    pub(crate) fn remove(&mut self, id: InstanceId) {
+        todo!()
+    }
+
+    pub(crate) fn contains(&self, id: InstanceId) -> bool {
+        self.instances.iter().any(|instance| instance.id == id)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Instance {
+    pub affine: nalgebra::Affine3<f32>,
+    pub mesh_id: MeshId,
+    pub(crate) id: InstanceId,
+}
+
+impl Instance {
+    // TODO: new
+    pub fn new(mesh: &Mesh) -> Self {
+        Self {
+            affine: nalgebra::Affine3::identity(),
+            mesh_id: mesh.id,
+            id: InstanceId(INSTANCES.fetch_add(1, Ordering::SeqCst))
+        }
+    }
+
+    pub fn with_transform(mut self, translate: nalgebra::Translation3<f32>) -> Self {
+        self.affine = self.affine * translate;
+        self 
+    }
+
+    pub(crate) fn to_raw(&self) -> InstanceRaw {
+        InstanceRaw {
+            model: self.affine.to_homogeneous().into(),
+        }
+    }
+}
 
 #[derive(Clone, Debug)]
 pub struct Model {
@@ -35,26 +164,33 @@ impl Model {
                 let mat_text = load_res(p.to_str().unwrap());
                 tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
             },
-        ).unwrap();
+        )
+            .unwrap();
 
-        let mut meshes = models.into_iter().map(|m| {
-            Mesh::new(m.mesh.indices.iter().map(|&i| {
-                Vertex {
-                    position: [
-                        m.mesh.positions[i as usize * 3],
-                        m.mesh.positions[i as usize * 3 + 1],
-                        m.mesh.positions[i as usize * 3 + 2],
-                    ],
-                    color: [
-                        1.0,
-                        1.0,
-                        1.0
-                    ]
-                }
-            }).collect::<Vec<_>>())
-        }).collect::<Vec<_>>();
+        let mut meshes = models
+            .into_iter()
+            .map(|m| {
+                // TODO: use indexed drawing
+                Mesh::new(
+                    m.mesh
+                        .indices
+                        .iter()
+                        .map(|&i| Vertex {
+                            position: [
+                                m.mesh.positions[i as usize * 3],
+                                m.mesh.positions[i as usize * 3 + 1],
+                                m.mesh.positions[i as usize * 3 + 2],
+                            ],
+                            color: [1.0, 1.0, 1.0],
+                        })
+                        .collect::<Vec<_>>(),
+                )
+            })
+            .collect::<Vec<_>>();
 
-        if meshes.len() > 1 { panic!("can't do multiple meshes"); }
+        if meshes.len() > 1 {
+            panic!("can't do multiple meshes");
+        }
 
         Self {
             mesh: meshes.pop().unwrap(), // TODO: handle multiple meshes
@@ -70,6 +206,9 @@ impl Renderable for Model {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct MeshId(pub u32);
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct InstanceId(pub u32);
 
 #[derive(Clone, Debug)]
 pub struct Mesh {
