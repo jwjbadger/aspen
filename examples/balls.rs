@@ -1,12 +1,10 @@
 use aspen::{
-    camera::Camera,
     camera::FpvCamera,
-    /*component::Component,*/
     entity::Entity,
     input::InputManager,
-    mesh::{Mesh, Model, Vertex, Instance},
+    mesh::{Instance, Model},
     system::{Query, System},
-    App, /*World,*/ WorldBuilder,
+    App, WorldBuilder,
 };
 
 use std::collections::HashSet;
@@ -25,7 +23,7 @@ fn main() {
     let mut world = WorldBuilder::new().with_frequency(60).build();
 
     let balls = std::iter::repeat(0)
-        .take(10)
+        .take(9)
         .map(|_| world.new_entity())
         .collect::<Vec<Entity>>();
 
@@ -64,14 +62,15 @@ fn main() {
             )
         }
 
-        world.add_component(
-            *ball,
-            Instance::new(&sphere_model.mesh).with_transform(
-                nalgebra::Translation3::from(
-                    nalgebra::Vector3::new(3.0 * index as f32, 0.0, 0.0),
-                ),
-            ),
-        );
+        world.add_component(*ball, {
+            let mut instance = Instance::new(&sphere_model.mesh);
+            instance.translate(nalgebra::Translation3::from(nalgebra::Vector3::new(
+                3.0 * (index % 3) as f32,
+                3.0 * (index / 3) as f32,
+                0.0,
+            )));
+            instance
+        });
     });
 
     world.add_fixed_system(System::new(
@@ -83,7 +82,7 @@ fn main() {
             let mut keys = Vec::new();
 
             query.get::<InputManager>().iter_mut().for_each(|e| {
-                e.data.iter_mut().for_each(|(entity, input)| {
+                e.data.iter_mut().for_each(|(_entity, input)| {
                     input.keys.iter().for_each(|key| {
                         keys.push(key.clone());
                     });
@@ -95,7 +94,7 @@ fn main() {
                     .get::<Arc<Mutex<FpvCamera>>>()
                     .iter_mut()
                     .for_each(|e| {
-                        e.data.iter_mut().for_each(|(entity, camera)| {
+                        e.data.iter_mut().for_each(|(_entity, camera)| {
                             if let winit::keyboard::PhysicalKey::Code(code) = key {
                                 let mut camera = camera.lock().unwrap();
 
@@ -113,7 +112,7 @@ fn main() {
                                     }
                                     .try_normalize(0.001.into())
                                     .unwrap_or(nalgebra::Vector3::zeros())
-                                        * 0.01,
+                                        * 0.08,
                                     nalgebra::Vector3::new(0.0, 0.0, 0.0),
                                 );
 
@@ -125,43 +124,43 @@ fn main() {
         },
     ));
 
-    /*world.add_fixed_system(System::new(
+    world.add_fixed_system(System::new(
         vec![
             std::any::TypeId::of::<Instance>(),
             std::any::TypeId::of::<Velocity>(),
         ],
         |mut query: Query| {
-            let mut new_transform: std::collections::HashMap<Entity, Instance> =
+            let mut new_instance: std::collections::HashMap<Entity, Instance> =
                 std::collections::HashMap::new();
 
-            query.get::<Transform>().iter_mut().for_each(|e| {
-                e.data.iter_mut().for_each(|(entity, trans)| {
-                    new_position.insert(
+            query.get::<Instance>().iter_mut().for_each(|e| {
+                e.data.iter_mut().for_each(|(entity, instance)| {
+                    new_instance.insert(
                         entity.clone(),
-                        Transform {
-                            position: trans.position.clone(),
-                            scale: trans.scale.clone(),
-                            rotation: trans.rotation.clone(),
-                        }
+                        (*instance.as_ref()).clone()
                     );
                 });
             });
 
             query.get::<Velocity>().iter_mut().for_each(|e| {
                 e.data.iter_mut().for_each(|(entity, velocity)| {
-                    new_transform.get_mut(entity).map(|trans| {
-                        trans.position.x += velocity.x / 60.0;
-                        trans.position.y += velocity.y / 60.0;
-                        trans.position.z += velocity.z / 60.0;
+                    new_instance.get_mut(entity).map(|instance| {
+                        instance.translate(nalgebra::Translation3::from(
+                            nalgebra::Vector3::new(
+                                velocity.x / 600.0,
+                                velocity.y / 600.0,
+                                velocity.z / 600.0,
+                            ),
+                        ));
                     });
                 });
             });
 
-            new_transform
+            new_instance
                 .drain()
-                .for_each(|(entity, new_trans)| query.set::<Transform>(entity, new_trans))
+                .for_each(|(entity, instance)| query.set::<Instance>(entity, instance))
         },
-    ));*/
+    ));
 
     let app = App::new(world, camera);
     app.run();

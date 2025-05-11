@@ -57,37 +57,33 @@ impl InstanceInfo {
         let instance_count = instances.len();
 
         let instance_data = instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
-        let instance_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: bytemuck::cast_slice(&instance_data),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
         Self {
             instance_buffer,
             instance_buffer_size: instance_count, // TODO: vec-like resizing
-            instance_count: instance_count,
-            instances: instances, 
+            instance_count,
+            instances,
         }
     }
 
-    pub(crate) fn append(
-        &mut self,
-        device: &wgpu::Device,
-        instance: Instance,
-    ) {
+    pub(crate) fn append(&mut self, device: &wgpu::Device, instance: Instance) {
         self.instances.push(instance);
-        let instance_data = self.instances.iter().map(Instance::to_raw).collect::<Vec<_>>();
+        let instance_data = self
+            .instances
+            .iter()
+            .map(Instance::to_raw)
+            .collect::<Vec<_>>();
 
-        let instance_buffer = device.create_buffer_init(
-            &wgpu::util::BufferInitDescriptor {
-                label: Some("Instance Buffer"),
-                contents: bytemuck::cast_slice(&instance_data),
-                usage: wgpu::BufferUsages::VERTEX,
-            }
-        );
+        let instance_buffer = device.create_buffer_init(&wgpu::util::BufferInitDescriptor {
+            label: Some("Instance Buffer"),
+            contents: bytemuck::cast_slice(&instance_data),
+            usage: wgpu::BufferUsages::VERTEX,
+        });
 
         // TODO: destroy?
 
@@ -97,7 +93,9 @@ impl InstanceInfo {
     }
 
     pub(crate) fn remove(&mut self, id: InstanceId) {
-        todo!()
+        self.instances.retain(|instance| instance.id != id);
+        self.instance_count -= 1;
+        // TODO: remove instance from buffer
     }
 
     pub(crate) fn contains(&self, id: InstanceId) -> bool {
@@ -107,7 +105,9 @@ impl InstanceInfo {
 
 #[derive(Clone, Debug)]
 pub struct Instance {
-    pub affine: nalgebra::Affine3<f32>,
+    pub translation: nalgebra::Translation3<f32>,
+    pub scale: nalgebra::Scale3<f32>,
+    pub rotation: nalgebra::UnitQuaternion<f32>,
     pub mesh_id: MeshId,
     pub(crate) id: InstanceId,
 }
@@ -116,20 +116,32 @@ impl Instance {
     // TODO: new
     pub fn new(mesh: &Mesh) -> Self {
         Self {
-            affine: nalgebra::Affine3::identity(),
+            translation: nalgebra::Translation3::identity(),
+            scale: nalgebra::Scale3::identity(),
+            rotation: nalgebra::UnitQuaternion::identity(),
             mesh_id: mesh.id,
-            id: InstanceId(INSTANCES.fetch_add(1, Ordering::SeqCst))
+            id: InstanceId(INSTANCES.fetch_add(1, Ordering::SeqCst)),
         }
     }
 
-    pub fn with_transform(mut self, translate: nalgebra::Translation3<f32>) -> Self {
-        self.affine = self.affine * translate;
-        self 
+    pub fn translate(&mut self, translate: nalgebra::Translation3<f32>) {
+        self.translation *= translate;
+    }
+
+    pub fn scale(&mut self, scale: nalgebra::Scale3<f32>) {
+        self.scale = scale;
+    }
+
+    pub fn rotate(&mut self, rotation: nalgebra::UnitQuaternion<f32>) {
+        self.rotation *= rotation;
     }
 
     pub(crate) fn to_raw(&self) -> InstanceRaw {
         InstanceRaw {
-            model: self.affine.to_homogeneous().into(),
+            model: (self.translation.to_homogeneous()
+                * self.rotation.to_homogeneous()
+                * self.scale.to_homogeneous())
+            .into(),
         }
     }
 }
@@ -153,7 +165,7 @@ impl Model {
         let obj_cursor = Cursor::new(obj_text);
         let mut obj_reader = BufReader::new(obj_cursor);
 
-        let (models, mtls) = tobj::load_obj_buf(
+        let (models, _mtls) = tobj::load_obj_buf(
             &mut obj_reader,
             &tobj::LoadOptions {
                 triangulate: true,
@@ -165,7 +177,7 @@ impl Model {
                 tobj::load_mtl_buf(&mut BufReader::new(Cursor::new(mat_text)))
             },
         )
-            .unwrap();
+        .unwrap();
 
         let mut meshes = models
             .into_iter()
