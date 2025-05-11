@@ -1,6 +1,6 @@
 use crate::{
     camera::{Camera, CameraUniform},
-    mesh::{Mesh, MeshId, Vertex},
+    mesh::{Mesh, MeshId, MeshInfo, Vertex},
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -24,7 +24,7 @@ pub struct WgpuRenderer<'a> {
     render_pipeline: wgpu::RenderPipeline,
     queue: wgpu::Queue,
     surface_config: wgpu::SurfaceConfiguration,
-    vertex_buffers: HashMap<MeshId, wgpu::Buffer>,
+    vertex_buffers: HashMap<MeshId, MeshInfo>,
     camera: Arc<Mutex<dyn Camera + 'a>>,
     camera_uniform: CameraUniform,
     camera_buffer: wgpu::Buffer,
@@ -45,7 +45,13 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                     usage: wgpu::BufferUsages::VERTEX,
                 });
 
-            self.vertex_buffers.insert(item.mesh().id, vertex_buffer);
+            self.vertex_buffers.insert(
+                item.mesh().id,
+                MeshInfo {
+                    vertex_count: item.mesh().vertices.len() as u32,
+                    vertex_buffer,
+                },
+            );
         }
     }
 
@@ -93,9 +99,9 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
             pass.set_pipeline(&self.render_pipeline);
             pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
-            for vertex_buffer in self.vertex_buffers.values() {
-                pass.set_vertex_buffer(0, vertex_buffer.slice(..));
-                pass.draw(0..3, 0..1); // TODO: Use the actual vertex count
+            for info in self.vertex_buffers.values() {
+                pass.set_vertex_buffer(0, info.vertex_buffer.slice(..));
+                pass.draw(0..info.vertex_count, 0..1); // TODO: Use the actual vertex count
             }
 
             self.vertex_buffers.clear();

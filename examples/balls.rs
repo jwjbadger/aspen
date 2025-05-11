@@ -77,42 +77,7 @@ fn main() {
             )
         }
 
-        world.add_component(
-            *ball,
-            Model {
-                mesh: Mesh::new(if index == 0 {
-                    vec![
-                        Vertex {
-                            position: [-0.5, 0.5, 0.0],
-                            color: [1.0, 0.0, 0.0],
-                        },
-                        Vertex {
-                            position: [-0.5, -0.5, 0.0],
-                            color: [0.0, 1.0, 0.0],
-                        },
-                        Vertex {
-                            position: [0.5, -0.5, 0.0],
-                            color: [0.0, 0.0, 1.0],
-                        },
-                    ]
-                } else {
-                    vec![
-                        Vertex {
-                            position: [-0.5, 0.5, 0.0],
-                            color: [1.0, 0.0, 0.0],
-                        },
-                        Vertex {
-                            position: [0.5, -0.5, 0.0],
-                            color: [0.0, 0.0, 1.0],
-                        },
-                        Vertex {
-                            position: [0.5, 0.5, 0.0],
-                            color: [0.0, 1.0, 0.0],
-                        },
-                    ]
-                }),
-            },
-        );
+        world.add_component(*ball, Model::from_obj("sphere.obj"));
     });
 
     world.add_fixed_system(System::new(
@@ -139,16 +104,22 @@ fn main() {
                         e.data.iter_mut().for_each(|(entity, camera)| {
                             if let winit::keyboard::PhysicalKey::Code(code) = key {
                                 let mut camera = camera.lock().unwrap();
-                                println!("{:?}", camera.eye);
 
                                 let t = nalgebra::Isometry3::new(
                                     match code {
                                         KeyCode::KeyW => camera.target - camera.eye,
                                         KeyCode::KeyS => -1.0 * (camera.target - camera.eye),
-                                        KeyCode::KeyA => -1.0 * (camera.target - camera.eye).cross(&camera.up),
-                                        KeyCode::KeyD => (camera.target - camera.eye).cross(&camera.up),
-                                        _ => nalgebra::Vector3::zeros(),                      
-                                    }.try_normalize(0.001.into()).unwrap_or(nalgebra::Vector3::zeros()) * 0.01,
+                                        KeyCode::KeyA => {
+                                            -1.0 * (camera.target - camera.eye).cross(&camera.up)
+                                        }
+                                        KeyCode::KeyD => {
+                                            (camera.target - camera.eye).cross(&camera.up)
+                                        }
+                                        _ => nalgebra::Vector3::zeros(),
+                                    }
+                                    .try_normalize(0.001.into())
+                                    .unwrap_or(nalgebra::Vector3::zeros())
+                                        * 0.01,
                                     nalgebra::Vector3::new(0.0, 0.0, 0.0),
                                 );
 
