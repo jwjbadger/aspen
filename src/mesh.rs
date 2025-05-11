@@ -38,21 +38,23 @@ impl Model {
         ).unwrap();
 
         let mut meshes = models.into_iter().map(|m| {
-            Mesh::new((0..m.mesh.positions.len() / 3).map(|i| {
+            Mesh::new(m.mesh.indices.iter().map(|&i| {
                 Vertex {
                     position: [
-                        m.mesh.positions[i * 3],
-                        m.mesh.positions[i * 3 + 1],
-                        m.mesh.positions[i * 3 + 2],
+                        m.mesh.positions[i as usize * 3],
+                        m.mesh.positions[i as usize * 3 + 1],
+                        m.mesh.positions[i as usize * 3 + 2],
                     ],
                     color: [
-                        0.0,
-                        0.0,
-                        0.0,
-                    ],
-                }  
+                        1.0,
+                        1.0,
+                        1.0
+                    ]
+                }
             }).collect::<Vec<_>>())
         }).collect::<Vec<_>>();
+
+        if meshes.len() > 1 { panic!("can't do multiple meshes"); }
 
         Self {
             mesh: meshes.pop().unwrap(), // TODO: handle multiple meshes
