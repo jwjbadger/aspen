@@ -1,6 +1,6 @@
 use crate::{
     camera::{Camera, CameraUniform},
-    mesh::{Mesh, MeshId, MeshInfo, Vertex, Instance, InstanceRaw, InstanceInfo},
+    mesh::{Instance, InstanceInfo, InstanceRaw, Mesh, MeshId, MeshInfo, Vertex},
 };
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -58,15 +58,25 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
         if self.instances.get(&item.mesh().id).is_none() {
             self.instances.insert(
                 item.mesh().id,
-                InstanceInfo::new(&self.device, vec![instance]),
+                InstanceInfo::new(&self.device, vec![]),
             );
-        } else if !self.instances.get(&item.mesh().id).unwrap().contains(instance.id) {
-            self.instances
-                .get_mut(&item.mesh().id)
-                .unwrap()
-                .append(&self.device, instance);
+        } else if self
+            .instances
+            .get(&item.mesh().id)
+            .unwrap()
+            .contains(instance.id)
+        {
+            self.instances.get_mut(&item.mesh().id).unwrap().remove(
+                instance.id,
+            );
         }
-    }
+
+        self.instances
+            .get_mut(&item.mesh().id)
+            .unwrap()
+            .append(&self.device, instance);
+        // TODO: refactor to remove unused instances
+        }
 
     fn render(&mut self) {
         self.camera_uniform
@@ -84,9 +94,9 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
 
         let mut command_encoder =
             self.device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Aspen Command Encoder"),
-                });
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Aspen Command Encoder"),
+            });
 
         {
             let mut pass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -113,18 +123,15 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
             pass.set_bind_group(0, &self.camera_bind_group, &[]);
 
             for mesh in self.instances.keys() {
-                let mesh_info = self
-                    .vertex_buffers
-                    .get(mesh)
-                    .expect("Mesh not found");
-                let instance_info = self
-                    .instances
-                    .get(mesh)
-                    .expect("Instance not found");
+                let mesh_info = self.vertex_buffers.get(mesh).expect("Mesh not found");
+                let instance_info = self.instances.get(mesh).expect("Instance not found");
 
                 pass.set_vertex_buffer(0, mesh_info.vertex_buffer.slice(..));
                 pass.set_vertex_buffer(1, instance_info.instance_buffer.slice(..));
-                pass.draw(0..mesh_info.vertex_count, 0..instance_info.instance_count as u32); // TODO: Use the actual vertex count
+                pass.draw(
+                    0..mesh_info.vertex_count,
+                    0..instance_info.instance_count as u32,
+                ); // TODO: Use the actual vertex count
             }
 
             self.vertex_buffers.clear();
@@ -172,7 +179,7 @@ impl<'a> WgpuRenderer<'a> {
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
-            .await
+        .await
             .unwrap();
 
         let (device, queue) = adapter
