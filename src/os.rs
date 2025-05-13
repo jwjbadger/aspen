@@ -1,12 +1,11 @@
 use winit::application::ApplicationHandler;
-use winit::event::{WindowEvent, DeviceEvent};
+use winit::event::{DeviceEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap},
     sync::{Arc, Mutex},
-    ops::Deref,
 };
 
 use crate::{
@@ -52,18 +51,15 @@ impl<'a, C: Camera + 'a> App<'a, C> {
 
 impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        let window = 
-            event_loop
-                .create_window(Window::default_attributes())
-                .unwrap();
-        window.set_cursor_grab(winit::window::CursorGrabMode::Confined).unwrap();
-        window.set_cursor_grab(
-            winit::window::CursorGrabMode::Locked,
-        ).unwrap();
+        let window = event_loop
+            .create_window(Window::default_attributes())
+            .unwrap();
+        window
+            .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+            .unwrap();
+        window.set_cursor_visible(false);
 
-        self.window = Some(Arc::new(
-            window
-        ));
+        self.window = Some(Arc::new(window));
 
         let size = self.window.as_ref().unwrap().inner_size();
         self.camera
@@ -117,10 +113,7 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
 
                 query.get::<InputManager>().iter_mut().for_each(|e| {
                     e.data.iter_mut().for_each(|(entity, _)| {
-                        new_keys.insert(
-                            entity.clone(),
-                            input.lock().unwrap().clone()
-                        );
+                        new_keys.insert(entity.clone(), input.lock().unwrap().clone());
                     })
                 });
 
@@ -169,8 +162,8 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             }
             WindowEvent::MouseInput {
                 device_id: _,
-                state,
-                button,
+                state: _,
+                button: _,
             } => {
                 // TODO: handle mouse input
             }
@@ -195,7 +188,9 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
                     1 => {
                         self.input.lock().unwrap().analog_input.1 = value as f32;
                     }
-                    _ => { panic!("unknown axis"); }
+                    _ => {
+                        panic!("unknown axis");
+                    }
                 }
             }
             _ => {}

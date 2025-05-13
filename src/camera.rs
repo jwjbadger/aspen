@@ -35,9 +35,9 @@ pub trait Camera {
     fn build_view_projection_matrix(&self) -> nalgebra::Matrix4<f32>;
 }
 #[derive(Debug, Clone)]
-pub struct FpvCamera {
+pub struct FlyCamera {
     pub eye: nalgebra::Point3<f32>,
-    pub target: nalgebra::Point3<f32>,
+    pub dir: nalgebra::Vector3<f32>,
     pub up: nalgebra::Vector3<f32>,
     pub aspect: f32,
     pub fovy: f32,
@@ -45,11 +45,11 @@ pub struct FpvCamera {
     pub zfar: f32,
 }
 
-impl Default for FpvCamera {
+impl Default for FlyCamera {
     fn default() -> Self {
         Self {
             eye: nalgebra::Point3::new(1.0, 1.0, 0.0),
-            target: nalgebra::Point3::new(0.0, 0.0, 0.0),
+            dir: (nalgebra::Point3::origin() - nalgebra::Point3::new(1.0, 1.0, 0.0)).normalize(),
             up: nalgebra::Vector3::y(),
             aspect: 16.0 / 9.0,
             fovy: 45.0,
@@ -59,13 +59,13 @@ impl Default for FpvCamera {
     }
 }
 
-impl Camera for FpvCamera {
+impl Camera for FlyCamera {
     fn resize(&mut self, width: f32, height: f32) {
         self.aspect = width / height;
     }
 
     fn build_view_projection_matrix(&self) -> nalgebra::Matrix4<f32> {
-        let view = nalgebra::Matrix4::look_at_rh(&self.eye, &self.target, &self.up);
+        let view = nalgebra::Matrix4::look_at_rh(&self.eye, &(self.eye + self.dir), &self.up);
         let projection = nalgebra::Perspective3::new(
             self.aspect,
             self.fovy * std::f32::consts::PI / 180.0,
@@ -74,5 +74,13 @@ impl Camera for FpvCamera {
         )
         .to_homogeneous();
         OPENGL_TO_WGPU_MATRIX * projection * view
+    }
+}
+
+impl FlyCamera {
+    pub fn turn(&mut self, angle: nalgebra::UnitQuaternion<f32>) {
+        self.dir = angle.transform_vector(&self.dir);
+        self.up = angle.transform_vector(&self.up);
+
     }
 }

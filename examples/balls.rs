@@ -1,5 +1,5 @@
 use aspen::{
-    camera::FpvCamera,
+    camera::FlyCamera,
     entity::Entity,
     input::InputManager,
     mesh::{Instance, Model},
@@ -33,13 +33,11 @@ fn main() {
     });
 
     let input_manager = world.new_entity();
-    world.add_component(
-        input_manager,
-        InputManager::new()    );
+    world.add_component(input_manager, InputManager::new());
 
-    let camera = Arc::new(Mutex::new(FpvCamera {
+    let camera = Arc::new(Mutex::new(FlyCamera {
         eye: nalgebra::Point3::new(2.0, 3.0, 4.0),
-        target: nalgebra::Point3::new(0.0, 0.0, 0.0),
+        dir: nalgebra::Vector3::x(),
         up: nalgebra::Vector3::y(),
         fovy: 45.0,
         ..Default::default()
@@ -73,7 +71,7 @@ fn main() {
     world.add_fixed_system(System::new(
         vec![
             std::any::TypeId::of::<InputManager>(),
-            std::any::TypeId::of::<Arc<Mutex<FpvCamera>>>(),
+            std::any::TypeId::of::<Arc<Mutex<FlyCamera>>>(),
         ],
         |mut query: Query| {
             let mut keys = Vec::new();
@@ -91,27 +89,35 @@ fn main() {
                 });
             });
 
-            println!("{:?}", analog_input);
+            query
+                .get::<Arc<Mutex<FlyCamera>>>()
+                .iter_mut()
+                .for_each(|e| {
+                    e.data.iter_mut().for_each(|(_entity, camera)| {
+                        let mut camera = camera.lock().unwrap();
+                        let up = camera.up;
+                        let right = camera.up.cross(&camera.dir);
 
-            keys.iter().for_each(|key| {
-                query
-                    .get::<Arc<Mutex<FpvCamera>>>()
-                    .iter_mut()
-                    .for_each(|e| {
-                        e.data.iter_mut().for_each(|(_entity, camera)| {
+                        camera.turn(
+                            nalgebra::UnitQuaternion::from_axis_angle(
+                                &nalgebra::Unit::new_normalize(up),
+                                -1.0 * analog_input.0 * 0.0008,
+                            ) * nalgebra::UnitQuaternion::from_axis_angle(
+                                &nalgebra::Unit::new_normalize(right),
+                                analog_input.1 * 0.0008,
+                            ),
+                        );
+
+                        keys.iter().for_each(|key| {
                             if let winit::keyboard::PhysicalKey::Code(code) = key {
-                                let mut camera = camera.lock().unwrap();
-
                                 let t = nalgebra::Isometry3::new(
                                     match code {
-                                        KeyCode::KeyW => camera.target - camera.eye,
-                                        KeyCode::KeyS => -1.0 * (camera.target - camera.eye),
-                                        KeyCode::KeyA => {
-                                            -1.0 * (camera.target - camera.eye).cross(&camera.up)
-                                        }
-                                        KeyCode::KeyD => {
-                                            (camera.target - camera.eye).cross(&camera.up)
-                                        }
+                                        KeyCode::KeyW => camera.dir,
+                                        KeyCode::KeyS => -1.0 * camera.dir,
+                                        KeyCode::KeyA => -1.0 * (camera.dir).cross(&camera.up),
+                                        KeyCode::KeyD => (camera.dir).cross(&camera.up),
+                                        KeyCode::ShiftLeft => camera.up,
+                                        KeyCode::ControlLeft => -1.0 * camera.up,
                                         _ => nalgebra::Vector3::zeros(),
                                     }
                                     .try_normalize(0.001.into())
@@ -120,11 +126,11 @@ fn main() {
                                     nalgebra::Vector3::new(0.0, 0.0, 0.0),
                                 );
 
-                                camera.eye = t * camera.eye;
+                                camera.eye = t.transform_point(&camera.eye);
                             }
                         });
                     });
-            });
+                });
 
             entities.drain(..).for_each(|e| {
                 query.set::<InputManager>(
