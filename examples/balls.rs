@@ -35,10 +35,7 @@ fn main() {
     let input_manager = world.new_entity();
     world.add_component(
         input_manager,
-        InputManager {
-            keys: HashSet::new(),
-        },
-    );
+        InputManager::new()    );
 
     let camera = Arc::new(Mutex::new(FpvCamera {
         eye: nalgebra::Point3::new(2.0, 3.0, 4.0),
@@ -80,16 +77,23 @@ fn main() {
         ],
         |mut query: Query| {
             let mut keys = Vec::new();
+            let mut analog_input: (f32, f32) = (0.0, 0.0);
+            let mut entities = Vec::new();
 
             query.get::<InputManager>().iter_mut().for_each(|e| {
-                e.data.iter_mut().for_each(|(_entity, input)| {
+                e.data.iter_mut().for_each(|(entity, input)| {
+                    entities.push(entity.clone());
+
                     input.keys.iter().for_each(|key| {
                         keys.push(key.clone());
                     });
+                    analog_input = input.analog_input;
                 });
             });
 
-            keys.into_iter().for_each(|key| {
+            println!("{:?}", analog_input);
+
+            keys.iter().for_each(|key| {
                 query
                     .get::<Arc<Mutex<FpvCamera>>>()
                     .iter_mut()
@@ -121,6 +125,16 @@ fn main() {
                         });
                     });
             });
+
+            entities.drain(..).for_each(|e| {
+                query.set::<InputManager>(
+                    e,
+                    InputManager {
+                        keys: HashSet::from_iter(keys.clone().into_iter()),
+                        analog_input: (0.0, 0.0),
+                    },
+                );
+            });
         },
     ));
 
@@ -135,23 +149,18 @@ fn main() {
 
             query.get::<Instance>().iter_mut().for_each(|e| {
                 e.data.iter_mut().for_each(|(entity, instance)| {
-                    new_instance.insert(
-                        entity.clone(),
-                        (*instance.as_ref()).clone()
-                    );
+                    new_instance.insert(entity.clone(), (*instance.as_ref()).clone());
                 });
             });
 
             query.get::<Velocity>().iter_mut().for_each(|e| {
                 e.data.iter_mut().for_each(|(entity, velocity)| {
                     new_instance.get_mut(entity).map(|instance| {
-                        instance.translate(nalgebra::Translation3::from(
-                            nalgebra::Vector3::new(
-                                velocity.x / 600.0,
-                                velocity.y / 600.0,
-                                velocity.z / 600.0,
-                            ),
-                        ));
+                        instance.translate(nalgebra::Translation3::from(nalgebra::Vector3::new(
+                            velocity.x / 600.0,
+                            velocity.y / 600.0,
+                            velocity.z / 600.0,
+                        )));
                     });
                 });
             });
