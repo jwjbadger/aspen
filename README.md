@@ -1,5 +1,7 @@
 # Aspen
 
+This is a complete work in progress! Please feel free to reach out if you have any questions. Screenshots and actual documentation coming soon :)
+
 A simple (in progress) WGPU-based game engine built in Rust and focused on customization especially in the realm of simulation. It relates entities and components as archetypes.
 
 ## Goals
