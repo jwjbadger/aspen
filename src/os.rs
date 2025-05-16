@@ -4,7 +4,7 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
 use std::{
-    collections::{HashMap},
+    collections::HashMap,
     sync::{Arc, Mutex},
 };
 
@@ -54,9 +54,7 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
         let window = event_loop
             .create_window(Window::default_attributes())
             .unwrap();
-        window
-            .set_cursor_grab(winit::window::CursorGrabMode::Locked)
-            .unwrap();
+
         window.set_cursor_visible(false);
 
         self.window = Some(Arc::new(window));
@@ -71,6 +69,9 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             WgpuRenderer::new(self.window.clone().unwrap(), self.camera.clone()),
         ))));
 
+        self.window.as_mut().unwrap()
+            .set_cursor_grab(winit::window::CursorGrabMode::Locked);
+
         self.world.add_dependent_system(ResourcedSystem::new(
             vec![
                 std::any::TypeId::of::<Model>(),
@@ -78,10 +79,8 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             ],
             self.renderer.as_mut().unwrap().clone(),
             |mut query, renderer| {
-                let mut models = Vec::new();
-                let mut instances = Vec::new();
-
-                query.get::<Model>().iter_mut().for_each(|e| {
+                // TODO: fix
+                /*query.get::<Model>().iter_mut().for_each(|e| {
                     e.data.iter_mut().for_each(|(_, model)| {
                         models.push(model.clone());
                     })
@@ -91,17 +90,17 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
                     e.data.iter_mut().for_each(|(_, instance)| {
                         instances.push(instance.clone()); // TODO: don't clone
                     })
-                });
+                });*/
 
-                models
-                    .into_iter()
-                    .zip(instances.drain(..))
-                    .for_each(|(model, instance)| {
-                        renderer
-                            .lock()
-                            .unwrap()
-                            .attach(model.as_ref(), instance.as_ref().clone());
-                    });
+                /*models
+                .into_iter()
+                .zip(instances.drain(..))
+                .for_each(|(model, instance)| {
+                    renderer
+                        .lock()
+                        .unwrap()
+                        .attach(model.as_ref(), instance.as_ref().clone());
+                });*/
             },
         ));
 
@@ -111,16 +110,16 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             |mut query, input| {
                 let mut new_keys = HashMap::<Entity, InputManager>::new();
 
-                query.get::<InputManager>().iter_mut().for_each(|e| {
+                /*query.get::<InputManager>().iter_mut().for_each(|e| {
                     e.data.iter_mut().for_each(|(entity, _)| {
                         new_keys.insert(entity.clone(), input.lock().unwrap().clone());
                     })
-                });
+                });*/
 
                 input.lock().unwrap().analog_input = (0.0, 0.0);
 
                 new_keys.drain().for_each(|(entity, input_manager)| {
-                    query.set::<InputManager>(entity, input_manager);
+                    //query.set::<InputManager>(entity, input_manager);
                 });
             },
         ));

@@ -2,7 +2,6 @@ use crate::{component::Component, entity::Entity};
 use std::any::Any;
 use std::any::TypeId;
 use std::collections::{HashMap, HashSet};
-use std::ops::DerefMut;
 use std::sync::{Arc, Mutex, MutexGuard};
 
 // Somehow has to match typeid to component
@@ -72,9 +71,9 @@ impl<'a> Query<'a> {
                 }
             })
             .collect()
-    }
+    }*/
 
-    pub fn set<T: 'static + Clone>(&mut self, entity: Entity, new: T) {
+    /*pub fn set<T: 'static + Clone>(&mut self, entity: Entity, new: T) {
         self.matches
             .iter_mut()
             .filter(|e| e.type_id == TypeId::of::<T>())

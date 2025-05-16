@@ -74,7 +74,7 @@ fn main() {
             std::any::TypeId::of::<Arc<Mutex<FlyCamera>>>(),
         ],
         |mut query: Query| {
-            let mut keys = Vec::new();
+            /*let mut keys = Vec::new();
             let mut analog_input: (f32, f32) = (0.0, 0.0);
             let mut entities = Vec::new();
 
@@ -140,7 +140,7 @@ fn main() {
                         analog_input: (0.0, 0.0),
                     },
                 );
-            });
+            });*/
         },
     ));
 
@@ -153,7 +153,7 @@ fn main() {
             let mut new_instance: std::collections::HashMap<Entity, Instance> =
                 std::collections::HashMap::new();
 
-            query.get::<Instance>().iter_mut().for_each(|e| {
+            /*query.get::<Instance>().iter_mut().for_each(|e| {
                 e.data.iter_mut().for_each(|(entity, instance)| {
                     new_instance.insert(entity.clone(), (*instance.as_ref()).clone());
                 });
@@ -173,7 +173,7 @@ fn main() {
 
             new_instance
                 .drain()
-                .for_each(|(entity, instance)| query.set::<Instance>(entity, instance))
+                .for_each(|(entity, instance)| query.set::<Instance>(entity, instance))*/
         },
     ));
 

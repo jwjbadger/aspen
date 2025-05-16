@@ -81,6 +81,5 @@ impl FlyCamera {
     pub fn turn(&mut self, angle: nalgebra::UnitQuaternion<f32>) {
         self.dir = angle.transform_vector(&self.dir);
         self.up = angle.transform_vector(&self.up);
-
     }
 }
