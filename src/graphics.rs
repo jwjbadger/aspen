@@ -56,19 +56,18 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
         }
 
         if self.instances.get(&item.mesh().id).is_none() {
-            self.instances.insert(
-                item.mesh().id,
-                InstanceInfo::new(&self.device, vec![]),
-            );
+            self.instances
+                .insert(item.mesh().id, InstanceInfo::new(&self.device, vec![]));
         } else if self
             .instances
             .get(&item.mesh().id)
             .unwrap()
             .contains(instance.id)
         {
-            self.instances.get_mut(&item.mesh().id).unwrap().remove(
-                instance.id,
-            );
+            self.instances
+                .get_mut(&item.mesh().id)
+                .unwrap()
+                .remove(instance.id);
         }
 
         self.instances
@@ -76,7 +75,7 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
             .unwrap()
             .append(&self.device, instance);
         // TODO: refactor to remove unused instances
-        }
+    }
 
     fn render(&mut self) {
         self.camera_uniform
@@ -94,9 +93,9 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
 
         let mut command_encoder =
             self.device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Aspen Command Encoder"),
-            });
+                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Aspen Command Encoder"),
+                });
 
         {
             let mut pass = command_encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -179,7 +178,7 @@ impl<'a> WgpuRenderer<'a> {
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
-        .await
+            .await
             .unwrap();
 
         let (device, queue) = adapter

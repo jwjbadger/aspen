@@ -1,16 +1,20 @@
 use crate::{component::Component, entity::Entity};
 use std::any::Any;
 use std::any::TypeId;
-use std::collections::HashSet;
-use std::rc::Rc;
+use std::collections::{HashMap, HashSet};
+use std::ops::DerefMut;
+use std::sync::{Arc, Mutex, MutexGuard};
 
 // Somehow has to match typeid to component
 pub struct Query<'a> {
-    matches: Vec<&'a mut Component<Rc<dyn Any>>>,
+    matches: Vec<&'a mut Component<Arc<Mutex<dyn Any>>>>,
 }
 
 impl<'a> Query<'a> {
-    pub fn new(haystack: &'a mut Vec<Component<Rc<dyn Any>>>, filter: &HashSet<TypeId>) -> Self {
+    pub fn new(
+        haystack: &'a mut Vec<Component<Arc<Mutex<dyn Any>>>>,
+        filter: &HashSet<TypeId>,
+    ) -> Self {
         Self {
             matches: haystack
                 .iter_mut()
@@ -19,7 +23,39 @@ impl<'a> Query<'a> {
         }
     }
 
-    pub fn get<T: 'static>(&mut self) -> Vec<Component<Rc<T>>> {
+    pub fn each<T: 'static>(&mut self, f: fn(&mut T)) {
+        self.matches
+            .iter_mut()
+            .filter(|e| e.type_id == TypeId::of::<T>())
+            .for_each(|e| {
+                e.data.iter_mut().for_each(|(_, v)| {
+                    f(v.lock().unwrap().downcast_mut::<T>().unwrap());
+                });
+            });
+    }
+
+    pub fn all<T: 'static>(&mut self, f: fn(HashMap<Entity, &mut T>)) {
+        let mut data = self
+            .matches
+            .iter_mut()
+            .filter(|e| e.type_id == TypeId::of::<T>())
+            .flat_map(|e| {
+                e.data
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.lock().unwrap())) // TODO: can we directly deref
+                    .collect::<Vec<(Entity, MutexGuard<dyn Any>)>>()
+            })
+            .collect::<HashMap<Entity, MutexGuard<dyn Any>>>();
+
+        let matches = data
+            .iter_mut()
+            .map(|(k, v)| (k.clone(), v.downcast_mut::<T>().unwrap()))
+            .collect::<HashMap<Entity, &mut T>>();
+
+        f(matches);
+    }
+
+    /*pub fn get<T: 'static>(&mut self) -> Vec<Component<Arc<Mutex<T>>>> {
         self.matches
             .iter_mut()
             .filter(|e| e.type_id == TypeId::of::<T>())
@@ -29,8 +65,8 @@ impl<'a> Query<'a> {
                     .clone()
                     .into_iter()
                     .map(|(k, v)| (k, v.downcast::<T>().unwrap()))
-                    .collect::<std::collections::HashMap<Entity, Rc<T>>>();
-                Component::<Rc<T>> {
+                    .collect::<std::collections::HashMap<Entity, Arc<Mutex<T>>>>();
+                Component::<Arc<Mutex<T>>> {
                     data,
                     type_id: e.type_id,
                 }
@@ -45,11 +81,11 @@ impl<'a> Query<'a> {
             .for_each(|e| {
                 e.data.iter_mut().for_each(|(k, mut v)| {
                     if *k == entity {
-                        *Rc::get_mut(&mut v).unwrap().downcast_mut::<T>().unwrap() = new.clone();
+                        *(v.lock().unwrap().downcast_mut::<T>()) = new.clone();
                     }
                 });
             });
-    }
+    }*/
 }
 
 pub trait SystemInterface {

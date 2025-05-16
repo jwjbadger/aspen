@@ -15,11 +15,15 @@ pub use crate::{
     system::{Query, System, SystemInterface},
 };
 
-use std::{any::Any, rc::Rc, time::Instant};
+use std::{
+    any::Any,
+    sync::{Arc, Mutex},
+    time::Instant,
+};
 
 pub struct World<'a> {
     entities: Vec<Entity>,
-    components: Vec<Component<Rc<dyn Any>>>,
+    components: Vec<Component<Arc<Mutex<dyn Any>>>>,
     fixed_systems: Vec<Box<dyn SystemInterface + 'a>>,
     dependent_systems: Vec<Box<dyn SystemInterface + 'a>>,
     current_id: u32,
@@ -62,7 +66,7 @@ impl<'a> World<'a> {
     pub fn add_component<T: Any + Clone>(&mut self, entity: Entity, data: T) {
         for e in self.components.iter_mut() {
             if e.type_id == std::any::TypeId::of::<T>() {
-                e.add_entity(entity, Rc::new(data.clone()));
+                e.add_entity(entity, Arc::new(Mutex::new(data.clone())));
                 return;
             }
         }
@@ -72,7 +76,7 @@ impl<'a> World<'a> {
         self.components
             .last_mut()
             .unwrap()
-            .add_entity(entity, Rc::new(data.clone()));
+            .add_entity(entity, Arc::new(Mutex::new(data.clone())));
     }
 
     pub fn add_fixed_system<T: SystemInterface + 'a>(&mut self, system: T) {

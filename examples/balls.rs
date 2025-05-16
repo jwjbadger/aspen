@@ -135,23 +135,18 @@ fn main() {
 
             query.get::<Instance>().iter_mut().for_each(|e| {
                 e.data.iter_mut().for_each(|(entity, instance)| {
-                    new_instance.insert(
-                        entity.clone(),
-                        (*instance.as_ref()).clone()
-                    );
+                    new_instance.insert(entity.clone(), (*instance.as_ref()).clone());
                 });
             });
 
             query.get::<Velocity>().iter_mut().for_each(|e| {
                 e.data.iter_mut().for_each(|(entity, velocity)| {
                     new_instance.get_mut(entity).map(|instance| {
-                        instance.translate(nalgebra::Translation3::from(
-                            nalgebra::Vector3::new(
-                                velocity.x / 600.0,
-                                velocity.y / 600.0,
-                                velocity.z / 600.0,
-                            ),
-                        ));
+                        instance.translate(nalgebra::Translation3::from(nalgebra::Vector3::new(
+                            velocity.x / 600.0,
+                            velocity.y / 600.0,
+                            velocity.z / 600.0,
+                        )));
                     });
                 });
             });
