@@ -1,10 +1,10 @@
 use winit::application::ApplicationHandler;
-use winit::event::WindowEvent;
+use winit::event::{DeviceEvent, WindowEvent};
 use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap},
     sync::{Arc, Mutex},
 };
 
@@ -26,7 +26,7 @@ where
     window: Option<Arc<Window>>,
     pub renderer: Option<Arc<Mutex<R>>>,
     pub world: World<'a>,
-    keys: Arc<Mutex<HashSet<winit::keyboard::PhysicalKey>>>,
+    input: Arc<Mutex<InputManager>>,
     camera: Arc<Mutex<C>>,
 }
 
@@ -37,7 +37,7 @@ impl<'a, C: Camera + 'a> App<'a, C> {
             world,
             renderer: None,
             camera,
-            keys: Arc::new(Mutex::new(HashSet::new())),
+            input: Arc::new(Mutex::new(InputManager::new())),
         }
     }
 
@@ -51,11 +51,15 @@ impl<'a, C: Camera + 'a> App<'a, C> {
 
 impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
     fn resumed(&mut self, event_loop: &ActiveEventLoop) {
-        self.window = Some(Arc::new(
-            event_loop
-                .create_window(Window::default_attributes())
-                .unwrap(),
-        ));
+        let window = event_loop
+            .create_window(Window::default_attributes())
+            .unwrap();
+        window
+            .set_cursor_grab(winit::window::CursorGrabMode::Locked)
+            .unwrap();
+        window.set_cursor_visible(false);
+
+        self.window = Some(Arc::new(window));
 
         let size = self.window.as_ref().unwrap().inner_size();
         self.camera
@@ -103,20 +107,17 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
 
         self.world.add_fixed_system(ResourcedSystem::new(
             vec![std::any::TypeId::of::<InputManager>()],
-            self.keys.clone(),
-            |mut query, keys| {
+            self.input.clone(),
+            |mut query, input| {
                 let mut new_keys = HashMap::<Entity, InputManager>::new();
 
                 query.get::<InputManager>().iter_mut().for_each(|e| {
                     e.data.iter_mut().for_each(|(entity, _)| {
-                        new_keys.insert(
-                            entity.clone(),
-                            InputManager {
-                                keys: keys.lock().unwrap().clone(),
-                            },
-                        );
+                        new_keys.insert(entity.clone(), input.lock().unwrap().clone());
                     })
                 });
+
+                input.lock().unwrap().analog_input = (0.0, 0.0);
 
                 new_keys.drain().for_each(|(entity, input_manager)| {
                     query.set::<InputManager>(entity, input_manager);
@@ -153,13 +154,46 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             } => {
                 if !is_synthetic && !event.repeat {
                     if event.state == winit::event::ElementState::Pressed {
-                        self.keys.lock().unwrap().insert(event.physical_key);
+                        self.input.lock().unwrap().keys.insert(event.physical_key);
                     } else if event.state == winit::event::ElementState::Released {
-                        self.keys.lock().unwrap().remove(&event.physical_key);
+                        self.input.lock().unwrap().keys.remove(&event.physical_key);
                     }
                 }
             }
+            WindowEvent::MouseInput {
+                device_id: _,
+                state: _,
+                button: _,
+            } => {
+                // TODO: handle mouse input
+            }
             _ => (),
+        }
+    }
+
+    fn device_event(
+        &mut self,
+        _event_loop: &ActiveEventLoop,
+        _device_id: winit::event::DeviceId,
+        event: winit::event::DeviceEvent,
+    ) {
+        // TODO: ensure wayland gets mouse events
+        match event {
+            DeviceEvent::Motion { axis, value } => {
+                // TODO: is there a better way to do this?
+                match axis {
+                    0 => {
+                        self.input.lock().unwrap().analog_input.0 = value as f32;
+                    }
+                    1 => {
+                        self.input.lock().unwrap().analog_input.1 = value as f32;
+                    }
+                    _ => {
+                        panic!("unknown axis");
+                    }
+                }
+            }
+            _ => {}
         }
     }
 }
