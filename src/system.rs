@@ -15,6 +15,7 @@ impl<'a> Query<'a> {
         haystack: &'a mut Vec<Component<Arc<Mutex<dyn Any>>>>,
         filter: &HashSet<TypeId>,
     ) -> Self {
+        // TODO: unexpected behavior doesn't remove components that aren't in both
         Self {
             matches: haystack
                 .iter_mut()
@@ -102,38 +103,6 @@ impl<'a> Query<'a> {
 
         f(matches);
     }
-
-    /*pub fn get<T: 'static>(&mut self) -> Vec<Component<Arc<Mutex<T>>>> {
-        self.matches
-            .iter_mut()
-            .filter(|e| e.type_id == TypeId::of::<T>())
-            .map(|e| {
-                let data = e
-                    .data
-                    .clone()
-                    .into_iter()
-                    .map(|(k, v)| (k, v.downcast::<T>().unwrap()))
-                    .collect::<std::collections::HashMap<Entity, Arc<Mutex<T>>>>();
-                Component::<Arc<Mutex<T>>> {
-                    data,
-                    type_id: e.type_id,
-                }
-            })
-            .collect()
-    }*/
-
-    /*pub fn set<T: 'static + Clone>(&mut self, entity: Entity, new: T) {
-        self.matches
-            .iter_mut()
-            .filter(|e| e.type_id == TypeId::of::<T>())
-            .for_each(|e| {
-                e.data.iter_mut().for_each(|(k, mut v)| {
-                    if *k == entity {
-                        *(v.lock().unwrap().downcast_mut::<T>()) = new.clone();
-                    }
-                });
-            });
-    }*/
 }
 
 pub trait SystemInterface {

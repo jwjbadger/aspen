@@ -4,13 +4,11 @@ use winit::event_loop::{ActiveEventLoop, ControlFlow, EventLoop};
 use winit::window::{Window, WindowId};
 
 use std::{
-    collections::HashMap,
     sync::{Arc, Mutex},
 };
 
 use crate::{
     camera::Camera,
-    entity::Entity,
     graphics::{Renderer, WgpuRenderer},
     input::InputManager,
     mesh::{Instance, Model},

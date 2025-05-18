@@ -118,70 +118,6 @@ fn main() {
                     }
                 }
             });
-
-            /*query.get::<InputManager>().iter_mut().for_each(|e| {
-                e.data.iter_mut().for_each(|(entity, input)| {
-                    entities.push(entity.clone());
-
-                    input.keys.iter().for_each(|key| {
-                        keys.push(key.clone());
-                    });
-                    analog_input = input.analog_input;
-                });
-            });*/
-
-            /*query
-                .get::<Arc<Mutex<FlyCamera>>>()
-                .iter_mut()
-                .for_each(|e| {
-                    e.data.iter_mut().for_each(|(_entity, camera)| {
-                        let mut camera = camera.lock().unwrap();
-                        let up = camera.up;
-                        let right = camera.up.cross(&camera.dir);
-
-                        camera.turn(
-                            nalgebra::UnitQuaternion::from_axis_angle(
-                                &nalgebra::Unit::new_normalize(up),
-                                -1.0 * analog_input.0 * 0.0008,
-                            ) * nalgebra::UnitQuaternion::from_axis_angle(
-                                &nalgebra::Unit::new_normalize(right),
-                                analog_input.1 * 0.0008,
-                            ),
-                        );
-
-                        keys.iter().for_each(|key| {
-                            if let winit::keyboard::PhysicalKey::Code(code) = key {
-                                let t = nalgebra::Isometry3::new(
-                                    match code {
-                                        KeyCode::KeyW => camera.dir,
-                                        KeyCode::KeyS => -1.0 * camera.dir,
-                                        KeyCode::KeyA => -1.0 * (camera.dir).cross(&camera.up),
-                                        KeyCode::KeyD => (camera.dir).cross(&camera.up),
-                                        KeyCode::ShiftLeft => camera.up,
-                                        KeyCode::ControlLeft => -1.0 * camera.up,
-                                        _ => nalgebra::Vector3::zeros(),
-                                    }
-                                    .try_normalize(0.001.into())
-                                    .unwrap_or(nalgebra::Vector3::zeros())
-                                        * 0.08,
-                                    nalgebra::Vector3::new(0.0, 0.0, 0.0),
-                                );
-
-                                camera.eye = t.transform_point(&camera.eye);
-                            }
-                        });
-                    });
-                });
-
-            entities.drain(..).for_each(|e| {
-                query.set::<InputManager>(
-                    e,
-                    InputManager {
-                        keys: HashSet::from_iter(keys.clone().into_iter()),
-                        analog_input: (0.0, 0.0),
-                    },
-                );
-            });*/
         },
     ));
 
@@ -191,30 +127,21 @@ fn main() {
             std::any::TypeId::of::<Velocity>(),
         ],
         |mut query: Query| {
-            let mut new_instance: std::collections::HashMap<Entity, Instance> =
-                std::collections::HashMap::new();
+            let instances = query
+                .get_all::<Instance>();
 
-            /*query.get::<Instance>().iter_mut().for_each(|e| {
-                e.data.iter_mut().for_each(|(entity, instance)| {
-                    new_instance.insert(entity.clone(), (*instance.as_ref()).clone());
-                });
+            query.all::<Velocity>(|velocities| {
+                for (entity, velocity) in velocities {
+                    let mut instance_guard = instances.get(&entity).unwrap().lock().unwrap();
+                    let instance = instance_guard.downcast_mut::<Instance>().unwrap();
+
+                    instance.translate(nalgebra::Translation3::from(nalgebra::Vector3::new(
+                        velocity.x / 600.0,
+                        velocity.y / 600.0,
+                        velocity.z / 600.0,
+                    )));
+                }
             });
-
-            query.get::<Velocity>().iter_mut().for_each(|e| {
-                e.data.iter_mut().for_each(|(entity, velocity)| {
-                    new_instance.get_mut(entity).map(|instance| {
-                        instance.translate(nalgebra::Translation3::from(nalgebra::Vector3::new(
-                            velocity.x / 600.0,
-                            velocity.y / 600.0,
-                            velocity.z / 600.0,
-                        )));
-                    });
-                });
-            });
-
-            new_instance
-                .drain()
-                .for_each(|(entity, instance)| query.set::<Instance>(entity, instance))*/
         },
     ));
 
