@@ -69,7 +69,10 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             WgpuRenderer::new(self.window.clone().unwrap(), self.camera.clone()),
         ))));
 
-        let _ = self.window.as_mut().unwrap()
+        let _ = self
+            .window
+            .as_mut()
+            .unwrap()
             .set_cursor_grab(winit::window::CursorGrabMode::Locked); // TODO: X11
 
         self.world.add_dependent_system(ResourcedSystem::new(
@@ -83,33 +86,17 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
 
                 query.all::<Model>(|models| {
                     for (entity, model) in models {
-                        println!("model: {:?}", model);
-                        //let instance: Instance = instances.get(&entity).unwrap().lock().unwrap().downcast_ref::<Instance>().unwrap().clone();
-                        //renderer.lock().unwrap().attach(model, instance);
+                        let instance: Instance = instances
+                            .get(&entity)
+                            .unwrap()
+                            .lock()
+                            .unwrap()
+                            .downcast_ref::<Instance>()
+                            .unwrap()
+                            .clone();
+                        renderer.lock().unwrap().attach(model, instance);
                     }
                 });
-                // TODO: fix
-                /*query.get::<Model>().iter_mut().for_each(|e| {
-                    e.data.iter_mut().for_each(|(_, model)| {
-                        models.push(model.clone());
-                    })
-                });
-
-                query.get::<Instance>().iter_mut().for_each(|e| {
-                    e.data.iter_mut().for_each(|(_, instance)| {
-                        instances.push(instance.clone()); // TODO: don't clone
-                    })
-                });*/
-
-                /*models
-                .into_iter()
-                .zip(instances.drain(..))
-                .for_each(|(model, instance)| {
-                    renderer
-                        .lock()
-                        .unwrap()
-                        .attach(model.as_ref(), instance.as_ref().clone());
-                });*/
             },
         ));
 

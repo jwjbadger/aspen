@@ -7,7 +7,6 @@ use aspen::{
     App, WorldBuilder,
 };
 
-use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 use winit::keyboard::KeyCode;
@@ -74,12 +73,30 @@ fn main() {
             std::any::TypeId::of::<FlyCamera>(),
         ],
         |mut query: Query| {
-            let camera_mutex = query.get::<FlyCamera>(&query.get_entities::<FlyCamera>()[0]).expect("Camera not found");
+            let camera_mutex = query
+                .get::<FlyCamera>(&query.get_entities::<FlyCamera>()[0])
+                .expect("Camera not found");
             let mut camera_guard = camera_mutex.lock().unwrap();
+
             let camera = camera_guard.downcast_mut::<FlyCamera>().unwrap();
+            let up = camera.up;
+            let right = camera.up.cross(&camera.dir);
 
             query.all::<InputManager>(|input_managers| {
-                for key in &input_managers.values().next().unwrap().keys {
+                let input_manager = &input_managers.values().next().unwrap();
+                let analog_input = input_manager.analog_input;
+
+                camera.turn(
+                    nalgebra::UnitQuaternion::from_axis_angle(
+                        &nalgebra::Unit::new_normalize(up),
+                        -1.0 * analog_input.0 * 0.0008,
+                    ) * nalgebra::UnitQuaternion::from_axis_angle(
+                        &nalgebra::Unit::new_normalize(right),
+                        analog_input.1 * 0.0008,
+                    ),
+                );
+
+                for key in &input_manager.keys {
                     if let winit::keyboard::PhysicalKey::Code(code) = key {
                         let t = nalgebra::Isometry3::new(
                             match code {

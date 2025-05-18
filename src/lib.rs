@@ -63,24 +63,27 @@ impl<'a> World<'a> {
         *self.entities.last().unwrap()
     }
 
-    pub fn add_component<T: Any + Clone>(&mut self, entity: Entity, data: T) {
-        self.share_component(entity, Arc::new(Mutex::new(data)));
+    pub fn add_component<T: Any + Clone + 'static>(&mut self, entity: Entity, data: T) {
+        self.share_component::<T>(entity, Arc::new(Mutex::new(data)));
     }
 
-    pub fn share_component<T: Any + Clone>(&mut self, entity: Entity, data: Arc<Mutex<T>>) {
+    pub fn share_component<T: Any + Clone + 'static>(
+        &mut self,
+        entity: Entity,
+        data: Arc<Mutex<T>>,
+    ) {
         for e in self.components.iter_mut() {
             if e.type_id == std::any::TypeId::of::<T>() {
-                e.add_entity(entity, Arc::new(Mutex::new(data.clone())));
+                e.add_entity(entity, data);
                 return;
             }
         }
 
         self.components
-            .push(Component::new(std::any::TypeId::of::<T>()));
-        self.components
-            .last_mut()
-            .unwrap()
-            .add_entity(entity, data);
+            .push(Component::<Arc<Mutex<dyn Any + 'static>>>::new(
+                std::any::TypeId::of::<T>(),
+            ));
+        self.components.last_mut().unwrap().add_entity(entity, data);
     }
 
     pub fn add_fixed_system<T: SystemInterface + 'a>(&mut self, system: T) {

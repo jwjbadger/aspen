@@ -24,12 +24,16 @@ impl<'a> Query<'a> {
     }
 
     pub fn get_entities<T: 'static>(&self) -> Vec<Entity> {
-        self.matches.iter().filter(|e| e.type_id == TypeId::of::<T>()).flat_map(|e| {
-            e.data
-                .iter()
-                .map(|(k, _)| k.clone())
-                .collect::<Vec<Entity>>()
-        }).collect()
+        self.matches
+            .iter()
+            .filter(|e| e.type_id == TypeId::of::<T>())
+            .flat_map(|e| {
+                e.data
+                    .iter()
+                    .map(|(k, _)| k.clone())
+                    .collect::<Vec<Entity>>()
+            })
+            .collect()
     }
 
     // it is guaranteed that dyn Any is of type T, but it seems impossible to downcast the Mutex
@@ -37,21 +41,28 @@ impl<'a> Query<'a> {
     // TODO: fix this
     pub fn get<T: 'static>(&self, ent: &Entity) -> Option<Arc<Mutex<dyn Any>>> {
         // TODO: check to make sure there's only one of each type of component
-        match self.matches
+        match self
+            .matches
             .iter()
-            .filter(|e| e.type_id == TypeId::of::<T>()).next() {
-                Some(component) => component.data.get(ent).map(|v| v.clone()),
-                None => None
-            }
+            .filter(|e| e.type_id == TypeId::of::<T>())
+            .next()
+        {
+            Some(component) => component.data.get(ent).map(|v| v.clone()),
+            None => None,
+        }
     }
 
     pub fn get_all<T: 'static>(&self) -> HashMap<Entity, Arc<Mutex<dyn Any>>> {
-        self.matches.iter().filter(|e| e.type_id == TypeId::of::<T>()).flat_map(|e| {
-            e.data
-                .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
-                .collect::<Vec<(Entity, Arc<Mutex<dyn Any>>)>>()
-        }).collect()
+        self.matches
+            .iter()
+            .filter(|e| e.type_id == TypeId::of::<T>())
+            .flat_map(|e| {
+                e.data
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone()))
+                    .collect::<Vec<(Entity, Arc<Mutex<dyn Any>>)>>()
+            })
+            .collect()
     }
 
     pub fn each<T: 'static>(&mut self, f: fn(&mut T)) {
@@ -80,7 +91,13 @@ impl<'a> Query<'a> {
 
         let matches = data
             .iter_mut()
-            .map(|(k, v)| (k.clone(), v.downcast_mut::<T>().expect("couldn't downcast value")))
+            .map(|(k, v)| {
+                (
+                    k.clone(),
+                    v.downcast_mut::<T>()
+                        .expect(&format!("couldn't downcast value for ent: {:?}", k)),
+                )
+            })
             .collect::<HashMap<Entity, &mut T>>();
 
         f(matches);
