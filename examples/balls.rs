@@ -43,7 +43,7 @@ fn main() {
         ..Default::default()
     }));
 
-    world.add_component(input_manager, camera.clone());
+    world.share_component(input_manager, camera.clone());
 
     balls.iter().enumerate().for_each(|(index, ball)| {
         if index < 5 {
@@ -71,14 +71,38 @@ fn main() {
     world.add_fixed_system(System::new(
         vec![
             std::any::TypeId::of::<InputManager>(),
-            std::any::TypeId::of::<Arc<Mutex<FlyCamera>>>(),
+            std::any::TypeId::of::<FlyCamera>(),
         ],
         |mut query: Query| {
-            /*let mut keys = Vec::new();
-            let mut analog_input: (f32, f32) = (0.0, 0.0);
-            let mut entities = Vec::new();
+            let camera_mutex = query.get::<FlyCamera>(&query.get_entities::<FlyCamera>()[0]).expect("Camera not found");
+            let mut camera_guard = camera_mutex.lock().unwrap();
+            let camera = camera_guard.downcast_mut::<FlyCamera>().unwrap();
 
-            query.get::<InputManager>().iter_mut().for_each(|e| {
+            query.all::<InputManager>(|input_managers| {
+                for key in &input_managers.values().next().unwrap().keys {
+                    if let winit::keyboard::PhysicalKey::Code(code) = key {
+                        let t = nalgebra::Isometry3::new(
+                            match code {
+                                KeyCode::KeyW => camera.dir,
+                                KeyCode::KeyS => -1.0 * camera.dir,
+                                KeyCode::KeyA => -1.0 * (camera.dir).cross(&camera.up),
+                                KeyCode::KeyD => (camera.dir).cross(&camera.up),
+                                KeyCode::ShiftLeft => camera.up,
+                                KeyCode::ControlLeft => -1.0 * camera.up,
+                                _ => nalgebra::Vector3::zeros(),
+                            }
+                            .try_normalize(0.001.into())
+                            .unwrap_or(nalgebra::Vector3::zeros())
+                                * 0.08,
+                            nalgebra::Vector3::new(0.0, 0.0, 0.0),
+                        );
+
+                        camera.eye = t.transform_point(&camera.eye);
+                    }
+                }
+            });
+
+            /*query.get::<InputManager>().iter_mut().for_each(|e| {
                 e.data.iter_mut().for_each(|(entity, input)| {
                     entities.push(entity.clone());
 
@@ -87,9 +111,9 @@ fn main() {
                     });
                     analog_input = input.analog_input;
                 });
-            });
+            });*/
 
-            query
+            /*query
                 .get::<Arc<Mutex<FlyCamera>>>()
                 .iter_mut()
                 .for_each(|e| {

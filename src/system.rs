@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex, MutexGuard};
 
 // Somehow has to match typeid to component
+#[derive(Debug)]
 pub struct Query<'a> {
     matches: Vec<&'a mut Component<Arc<Mutex<dyn Any>>>>,
 }
@@ -22,6 +23,37 @@ impl<'a> Query<'a> {
         }
     }
 
+    pub fn get_entities<T: 'static>(&self) -> Vec<Entity> {
+        self.matches.iter().filter(|e| e.type_id == TypeId::of::<T>()).flat_map(|e| {
+            e.data
+                .iter()
+                .map(|(k, _)| k.clone())
+                .collect::<Vec<Entity>>()
+        }).collect()
+    }
+
+    // it is guaranteed that dyn Any is of type T, but it seems impossible to downcast the Mutex
+    // without first turning it into a MutexGuard
+    // TODO: fix this
+    pub fn get<T: 'static>(&self, ent: &Entity) -> Option<Arc<Mutex<dyn Any>>> {
+        // TODO: check to make sure there's only one of each type of component
+        match self.matches
+            .iter()
+            .filter(|e| e.type_id == TypeId::of::<T>()).next() {
+                Some(component) => component.data.get(ent).map(|v| v.clone()),
+                None => None
+            }
+    }
+
+    pub fn get_all<T: 'static>(&self) -> HashMap<Entity, Arc<Mutex<dyn Any>>> {
+        self.matches.iter().filter(|e| e.type_id == TypeId::of::<T>()).flat_map(|e| {
+            e.data
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect::<Vec<(Entity, Arc<Mutex<dyn Any>>)>>()
+        }).collect()
+    }
+
     pub fn each<T: 'static>(&mut self, f: fn(&mut T)) {
         self.matches
             .iter_mut()
@@ -33,7 +65,7 @@ impl<'a> Query<'a> {
             });
     }
 
-    pub fn all<T: 'static>(&mut self, f: fn(HashMap<Entity, &mut T>)) {
+    pub fn all<T: 'static>(&mut self, f: impl FnOnce(HashMap<Entity, &mut T>)) {
         let mut data = self
             .matches
             .iter_mut()
@@ -48,7 +80,7 @@ impl<'a> Query<'a> {
 
         let matches = data
             .iter_mut()
-            .map(|(k, v)| (k.clone(), v.downcast_mut::<T>().unwrap()))
+            .map(|(k, v)| (k.clone(), v.downcast_mut::<T>().expect("couldn't downcast value")))
             .collect::<HashMap<Entity, &mut T>>();
 
         f(matches);

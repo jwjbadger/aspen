@@ -69,8 +69,8 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             WgpuRenderer::new(self.window.clone().unwrap(), self.camera.clone()),
         ))));
 
-        self.window.as_mut().unwrap()
-            .set_cursor_grab(winit::window::CursorGrabMode::Locked);
+        let _ = self.window.as_mut().unwrap()
+            .set_cursor_grab(winit::window::CursorGrabMode::Locked); // TODO: X11
 
         self.world.add_dependent_system(ResourcedSystem::new(
             vec![
@@ -79,6 +79,15 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             ],
             self.renderer.as_mut().unwrap().clone(),
             |mut query, renderer| {
+                let instances = query.get_all::<Instance>();
+
+                query.all::<Model>(|models| {
+                    for (entity, model) in models {
+                        println!("model: {:?}", model);
+                        //let instance: Instance = instances.get(&entity).unwrap().lock().unwrap().downcast_ref::<Instance>().unwrap().clone();
+                        //renderer.lock().unwrap().attach(model, instance);
+                    }
+                });
                 // TODO: fix
                 /*query.get::<Model>().iter_mut().for_each(|e| {
                     e.data.iter_mut().for_each(|(_, model)| {
@@ -108,19 +117,19 @@ impl<'a, C: Camera + 'a> ApplicationHandler for App<'a, C> {
             vec![std::any::TypeId::of::<InputManager>()],
             self.input.clone(),
             |mut query, input| {
-                let mut new_keys = HashMap::<Entity, InputManager>::new();
+                // TODO: just reference the same input manager :skull:
+                query.all::<InputManager>(|mut input_managers| {
+                    let input = input.lock().unwrap();
+                    let keys = &input.keys;
+                    let analog_input = input.analog_input;
 
-                /*query.get::<InputManager>().iter_mut().for_each(|e| {
-                    e.data.iter_mut().for_each(|(entity, _)| {
-                        new_keys.insert(entity.clone(), input.lock().unwrap().clone());
-                    })
-                });*/
+                    for (_, input_manager) in input_managers.iter_mut() {
+                        input_manager.keys = keys.clone();
+                        input_manager.analog_input = analog_input;
+                    }
+                });
 
                 input.lock().unwrap().analog_input = (0.0, 0.0);
-
-                new_keys.drain().for_each(|(entity, input_manager)| {
-                    //query.set::<InputManager>(entity, input_manager);
-                });
             },
         ));
     }
