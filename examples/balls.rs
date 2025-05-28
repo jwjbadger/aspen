@@ -26,7 +26,7 @@ fn main() {
         .map(|_| world.new_entity())
         .collect::<Vec<Entity>>();
 
-    let sphere_model = Model::from_obj("sphere.obj");
+    let sphere_model = Model::from_obj("sphere.obj").with_tex("hello_texture.jpg");
     balls.iter().for_each(|ball| {
         world.add_component(*ball, sphere_model.clone());
     });
@@ -127,8 +127,7 @@ fn main() {
             std::any::TypeId::of::<Velocity>(),
         ],
         |mut query: Query| {
-            let instances = query
-                .get_all::<Instance>();
+            let instances = query.get_all::<Instance>();
 
             query.all::<Velocity>(|velocities| {
                 for (entity, velocity) in velocities {

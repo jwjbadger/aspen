@@ -9,5 +9,5 @@ futures = {version = "0.3.31", features = ["executor"]}
 image = "0.25.6"
 nalgebra = "0.33.2"
 tobj = {version = "4.0.3", features = ["async"]}
-wgpu = "23.0.1"
+wgpu = "25.0.2"
 winit = "0.30.7"

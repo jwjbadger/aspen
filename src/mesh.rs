@@ -149,6 +149,7 @@ impl Instance {
 #[derive(Clone, Debug)]
 pub struct Model {
     pub mesh: Mesh,
+    pub image: Option<image::RgbaImage>,
 }
 
 fn load_res(file_name: &str) -> String {
@@ -159,6 +160,12 @@ fn load_res(file_name: &str) -> String {
 }
 
 impl Model {
+    pub fn with_tex(mut self, filename: &str) -> Self {
+        let diffuse_image = image::ImageReader::open(std::path::Path::new(env!("OUT_DIR")).join("res").join(filename)).unwrap().decode().unwrap();
+        self.image =  Some(diffuse_image.to_rgba8());
+        self
+    }
+
     pub fn from_obj(file_name: &str) -> Self {
         let obj_text = load_res(file_name);
 
@@ -193,7 +200,7 @@ impl Model {
                                 m.mesh.positions[i as usize * 3 + 1],
                                 m.mesh.positions[i as usize * 3 + 2],
                             ],
-                            color: [1.0, 1.0, 1.0],
+                            tex_coords: [m.mesh.texcoords[(i * 2) as usize], 1.0 - m.mesh.texcoords[(i * 2 + 1) as usize]],
                         })
                         .collect::<Vec<_>>(),
                 )
@@ -206,14 +213,24 @@ impl Model {
 
         Self {
             mesh: meshes.pop().unwrap(), // TODO: handle multiple meshes
+            image: None,
         }
     }
 }
 
 impl Renderable for Model {
+    fn tex_image(&self) -> Option<image::RgbaImage> {
+        self.image.clone()
+    }
+
     fn mesh(&self) -> &Mesh {
         &self.mesh
     }
+}
+
+pub struct ModelInfo {
+    pub mesh_info: MeshInfo,
+    pub texture_info: Option<wgpu::BindGroup>
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -247,13 +264,13 @@ pub struct MeshInfo {
 #[derive(Copy, Clone, Debug, NoUninit)]
 pub struct Vertex {
     pub position: [f32; 3],
-    pub color: [f32; 3],
+    pub tex_coords: [f32; 2],
 }
 
 impl Vertex {
     const ATTRIBS: [wgpu::VertexAttribute; 2] = wgpu::vertex_attr_array![
         0 => Float32x3,
-        1 => Float32x3,
+        1 => Float32x2,
     ];
 
     pub fn desc() -> wgpu::VertexBufferLayout<'static> {
