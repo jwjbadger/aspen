@@ -1,5 +1,6 @@
 use crate::{
     camera::{Camera, CameraUniform},
+    texture::TextureBuilder,
     mesh::{Instance, InstanceInfo, InstanceRaw, Mesh, MeshId, MeshInfo, ModelInfo, Vertex},
 };
 use std::collections::HashMap;
@@ -15,7 +16,7 @@ pub trait Renderer<'a> {
 }
 
 pub trait Renderable {
-    fn tex_image(&self) -> Option<image::RgbaImage>;
+    fn tex_builder(&self) -> Option<TextureBuilder>;
     fn mesh(&self) -> &Mesh;
 }
 
@@ -55,78 +56,7 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                         vertex_count: item.mesh().vertices.len() as u32,
                         vertex_buffer,
                     },
-                    texture_info: item.tex_image().map(|rgba_image| {
-                        use image::GenericImageView;
-                        let dimensions = rgba_image.dimensions();
-
-                        let texture_size = wgpu::Extent3d {
-                            width: dimensions.0,
-                            height: dimensions.1,
-                            depth_or_array_layers: 1,
-                        };
-
-                        let diffuse_texture =
-                            self.device.create_texture(&wgpu::TextureDescriptor {
-                                size: texture_size,
-                                mip_level_count: 1,
-                                sample_count: 1,
-                                dimension: wgpu::TextureDimension::D2,
-                                format: wgpu::TextureFormat::Rgba8UnormSrgb,
-                                usage: wgpu::TextureUsages::TEXTURE_BINDING
-                                    | wgpu::TextureUsages::COPY_DST,
-                                label: Some("diffuse_texture"),
-                                view_formats: &[],
-                            });
-
-                        self.queue.write_texture(
-                            wgpu::TexelCopyTextureInfo {
-                                texture: &diffuse_texture,
-                                mip_level: 0,
-                                origin: wgpu::Origin3d::ZERO,
-                                aspect: wgpu::TextureAspect::All,
-                            },
-                            &rgba_image,
-                            wgpu::TexelCopyBufferLayout {
-                                offset: 0,
-                                bytes_per_row: Some(4 * dimensions.0),
-                                rows_per_image: Some(dimensions.1),
-                            },
-                            texture_size,
-                        );
-
-                        let diffuse_texture_view =
-                            diffuse_texture.create_view(&wgpu::TextureViewDescriptor::default());
-                        let diffuse_sampler =
-                            self.device.create_sampler(&wgpu::SamplerDescriptor {
-                                address_mode_u: wgpu::AddressMode::ClampToEdge,
-                                address_mode_v: wgpu::AddressMode::ClampToEdge,
-                                address_mode_w: wgpu::AddressMode::ClampToEdge,
-                                mag_filter: wgpu::FilterMode::Linear,
-                                min_filter: wgpu::FilterMode::Nearest,
-                                mipmap_filter: wgpu::FilterMode::Nearest,
-                                ..Default::default()
-                            });
-
-                        let diffuse_bind_group =
-                            self.device.create_bind_group(&wgpu::BindGroupDescriptor {
-                                layout: &self.texture_bind_group_layout,
-                                entries: &[
-                                    wgpu::BindGroupEntry {
-                                        binding: 0,
-                                        resource: wgpu::BindingResource::TextureView(
-                                            &diffuse_texture_view,
-                                        ),
-                                    },
-                                    wgpu::BindGroupEntry {
-                                        binding: 1,
-                                        resource: wgpu::BindingResource::Sampler(&diffuse_sampler),
-                                    },
-                                ],
-                                label: Some("diffuse_bind_group"),
-                            });
-
-                        diffuse_bind_group
-                    }),
+                    texture: item.tex_builder().map(|builder| builder.build(&self.device, &self.queue, &self.texture_bind_group_layout)),
                 },
             );
         }
@@ -201,8 +131,8 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                 let model_info = self.vertex_buffers.get(mesh).expect("Mesh not found");
                 let instance_info = self.instances.get(mesh).expect("Instance not found");
 
-                if let Some(texture_info) = model_info.texture_info.as_ref() {
-                    pass.set_bind_group(1, texture_info, &[]); 
+                if let Some(tex) = model_info.texture.as_ref() {
+                    pass.set_bind_group(1, Some(&tex.diffuse_bind_group), &[]); 
                 } else {
                     panic!("No texture")
                 }

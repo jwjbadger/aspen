@@ -1,4 +1,4 @@
-use crate::graphics::Renderable;
+use crate::{graphics::Renderable, texture::{Texture, TextureBuilder}};
 use bytemuck::NoUninit;
 use std::io::{BufReader, Cursor};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -149,7 +149,7 @@ impl Instance {
 #[derive(Clone, Debug)]
 pub struct Model {
     pub mesh: Mesh,
-    pub image: Option<image::RgbaImage>,
+    pub texture_builder: Option<TextureBuilder>,
 }
 
 fn load_res(file_name: &str) -> String {
@@ -160,9 +160,8 @@ fn load_res(file_name: &str) -> String {
 }
 
 impl Model {
-    pub fn with_tex(mut self, filename: &str) -> Self {
-        let diffuse_image = image::ImageReader::open(std::path::Path::new(env!("OUT_DIR")).join("res").join(filename)).unwrap().decode().unwrap();
-        self.image =  Some(diffuse_image.to_rgba8());
+    pub fn with_tex(mut self, builder: TextureBuilder) -> Self {
+        self.texture_builder = Some(builder);
         self
     }
 
@@ -213,14 +212,14 @@ impl Model {
 
         Self {
             mesh: meshes.pop().unwrap(), // TODO: handle multiple meshes
-            image: None,
+            texture_builder: None
         }
     }
 }
 
 impl Renderable for Model {
-    fn tex_image(&self) -> Option<image::RgbaImage> {
-        self.image.clone()
+    fn tex_builder(&self) -> Option<TextureBuilder> {
+        self.texture_builder.clone()
     }
 
     fn mesh(&self) -> &Mesh {
@@ -230,7 +229,7 @@ impl Renderable for Model {
 
 pub struct ModelInfo {
     pub mesh_info: MeshInfo,
-    pub texture_info: Option<wgpu::BindGroup>
+    pub texture: Option<Texture>
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

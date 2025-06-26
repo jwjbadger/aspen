@@ -4,6 +4,7 @@ use aspen::{
     input::InputManager,
     mesh::{Instance, Model},
     system::{Query, System},
+    texture::TextureBuilder,
     App, WorldBuilder,
 };
 
@@ -26,7 +27,7 @@ fn main() {
         .map(|_| world.new_entity())
         .collect::<Vec<Entity>>();
 
-    let sphere_model = Model::from_obj("sphere.obj").with_tex("hello_texture.jpg");
+    let sphere_model = Model::from_obj("sphere.obj").with_tex(TextureBuilder::from_image("hello_texture.jpg"));
     balls.iter().for_each(|ball| {
         world.add_component(*ball, sphere_model.clone());
     });
