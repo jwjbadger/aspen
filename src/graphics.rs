@@ -1,6 +1,6 @@
 use crate::{
     camera::{Camera, CameraUniform},
-    texture::TextureBuilder,
+    texture::{TextureBuilder, Texture},
     mesh::{Instance, InstanceInfo, InstanceRaw, Mesh, MeshId, MeshInfo, ModelInfo, Vertex},
 };
 use std::collections::HashMap;
@@ -25,6 +25,7 @@ pub struct WgpuRenderer<'a> {
     device: wgpu::Device,
     render_pipeline: wgpu::RenderPipeline,
     queue: wgpu::Queue,
+    depth_texture: Texture,
     surface_config: wgpu::SurfaceConfiguration,
     vertex_buffers: HashMap<MeshId, ModelInfo>,
     instances: HashMap<MeshId, InstanceInfo>,
@@ -56,7 +57,7 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                         vertex_count: item.mesh().vertices.len() as u32,
                         vertex_buffer,
                     },
-                    texture: item.tex_builder().map(|builder| builder.build(&self.device, &self.queue, &self.texture_bind_group_layout)),
+                    texture_bind_group: item.tex_builder().map(|builder| builder.build(&self.device, &self.queue).into_bind_group(&self.device, &self.texture_bind_group_layout)),
                 },
             );
         }
@@ -119,7 +120,14 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                         store: wgpu::StoreOp::Store,
                     },
                 })],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment: Some(wgpu::RenderPassDepthStencilAttachment {
+                    view: &self.depth_texture.view,
+                    depth_ops: Some(wgpu::Operations {
+                        load: wgpu::LoadOp::Clear(1.0),
+                        store: wgpu::StoreOp::Store,
+                    }),
+                    stencil_ops: None,
+                }),
                 occlusion_query_set: None,
                 timestamp_writes: None,
             });
@@ -131,8 +139,8 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
                 let model_info = self.vertex_buffers.get(mesh).expect("Mesh not found");
                 let instance_info = self.instances.get(mesh).expect("Instance not found");
 
-                if let Some(tex) = model_info.texture.as_ref() {
-                    pass.set_bind_group(1, Some(&tex.diffuse_bind_group), &[]); 
+                if let Some(texture_bind_group) = model_info.texture_bind_group.as_ref() {
+                    pass.set_bind_group(1, Some(texture_bind_group), &[]); 
                 } else {
                     panic!("No texture")
                 }
@@ -164,6 +172,7 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
             .update_raw(camera.build_view_projection_matrix());
 
         self.surface.configure(&self.device, &self.surface_config);
+        self.depth_texture = Texture::create_depth_texture(&self.device, &self.surface_config);
     }
 }
 
@@ -190,7 +199,7 @@ impl<'a> WgpuRenderer<'a> {
                 compatible_surface: Some(&surface),
                 force_fallback_adapter: false,
             })
-            .await
+        .await
             .unwrap();
 
         let (device, queue) = adapter
@@ -199,7 +208,7 @@ impl<'a> WgpuRenderer<'a> {
                 required_features: wgpu::Features::empty(),
                 ..Default::default()
             })
-            .await
+        .await
             .unwrap();
 
         let surface_caps = surface.get_capabilities(&adapter);
@@ -318,7 +327,13 @@ impl<'a> WgpuRenderer<'a> {
                 polygon_mode: wgpu::PolygonMode::Fill,
                 ..Default::default()
             },
-            depth_stencil: None,
+            depth_stencil: Some(wgpu::DepthStencilState {
+                format: Texture::DEPTH_FORMAT,
+                depth_write_enabled: true,
+                depth_compare: wgpu::CompareFunction::Less,
+                stencil: wgpu::StencilState::default(),
+                bias: wgpu::DepthBiasState::default(),
+            }),
             multisample: wgpu::MultisampleState {
                 count: 1,
                 mask: !0,
@@ -328,11 +343,14 @@ impl<'a> WgpuRenderer<'a> {
             multiview: None,
         });
 
+        let depth_texture = Texture::create_depth_texture(&device, &config);
+
         WgpuRenderer {
             surface,
             device,
             render_pipeline,
             queue,
+            depth_texture,
             surface_config: config,
             vertex_buffers: HashMap::new(),
             instances: HashMap::new(),

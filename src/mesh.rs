@@ -1,4 +1,4 @@
-use crate::{graphics::Renderable, texture::{Texture, TextureBuilder}};
+use crate::{graphics::Renderable, texture::TextureBuilder};
 use bytemuck::NoUninit;
 use std::io::{BufReader, Cursor};
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -229,7 +229,7 @@ impl Renderable for Model {
 
 pub struct ModelInfo {
     pub mesh_info: MeshInfo,
-    pub texture: Option<Texture>
+    pub texture_bind_group: Option<wgpu::BindGroup>
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
