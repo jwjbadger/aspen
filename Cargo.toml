@@ -1,11 +1,13 @@
 [package]
-name = "aspen"
+name = "aspeng"
 version = "0.1.0"
 edition = "2021"
 license-file = "LICENSE"
 description = "A simple game engine built around the ECS architecture"
 repository = "https://github.com/jwjbadger/aspen/"
 readme = "README.md"
+keywords = ["gamedev", "graphics", "ECS", "gui", "game-engine"]
+catagories = ["game-engines", "graphics", "gui", "rendering::engine"]
 
 [dependencies]
 bytemuck = {version = "1.23.0", features = ["derive"]}
