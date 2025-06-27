@@ -30,18 +30,33 @@ impl CameraUniform {
     }
 }
 
+/// Represents a generic camera that can be used in [`App`]
+///
+/// [`App`]: crate::App
 pub trait Camera {
+    /// Called whenever the app is resized
     fn resize(&mut self, width: f32, height: f32);
+    /// Required to work with the WGPU renderer. Generates a view_projection matrix to translate
+    /// objects into clip space.
     fn build_view_projection_matrix(&self) -> nalgebra::Matrix4<f32>;
 }
+
+/// A generic example of a fly camera.
 #[derive(Debug, Clone)]
 pub struct FlyCamera {
+    /// The location of the viewer.
     pub eye: nalgebra::Point3<f32>,
+    /// The direction the viewer is looking (normalized).
     pub dir: nalgebra::Vector3<f32>,
+    /// Points straight up from the viewer to determine how the camera is rotated.
     pub up: nalgebra::Vector3<f32>,
+    /// The aspect ratio of the screen.
     pub aspect: f32,
+    /// The fov of the screen.
     pub fovy: f32,
+    /// Anything closer than this will be clipped.
     pub znear: f32,
+    /// Anything further than this will be clipped.
     pub zfar: f32,
 }
 
@@ -78,6 +93,7 @@ impl Camera for FlyCamera {
 }
 
 impl FlyCamera {
+    /// Turns the camera in a specific direction offset from its current rotation.
     pub fn turn(&mut self, angle: nalgebra::UnitQuaternion<f32>) {
         self.dir = angle.transform_vector(&self.dir);
         self.up = angle.transform_vector(&self.up);

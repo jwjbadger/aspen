@@ -2,6 +2,9 @@ use crate::Entity;
 use std::any::TypeId;
 use std::collections::HashMap;
 
+/// A wrapper for data that associates it with an entity.
+///
+/// Currently has no use in the publically accessible API although it may eventually gain some use.
 #[derive(Clone, Debug)]
 pub struct Component<T: 'static> {
     pub(crate) data: HashMap<Entity, T>,

@@ -1,13 +1,37 @@
+//! A simple (in progress) WGPU-based game engine built in Rust and focused on customization 
+//! especially in the realm of simulation. It relates entities and components as archetypes.
+//!
+//! Focuses on three main goals:
+//! - **Customizable**: Every task completed by the user should be customizable and all engine code
+//! (with exception of the core ECS system) should be replaceable.
+//! - **Simple**: Tasks should be simple to complete and intuitive to learn or well-documented when
+//! unintuitive.
+//! - **Data-driven**: Data should be the focus of all tasks as dictated by the ECS paradigm.
+//!
+//! See the [`README`] for more information.
+//!
+//! [`README`]: https://github.com/jwjbadger/aspen
 #![warn(missing_docs)]
 
+/// Handles everything related to the camera, which provides a point of access to the world,
+/// allowing it to be rendered to the screen.
 pub mod camera;
+/// Handles everything related to WGPU textures, allowing them to be built and used by WGPU.
 pub mod texture;
+/// Handles the component side of ECS. Rarely used externally.
 pub mod component;
+/// Handles the entity side of ECS.
 pub mod entity;
+/// Primarily handles renderers and renderable objects.
 pub mod graphics;
+/// Handles all input.
 pub mod input;
+/// Holds all structures required to create something that is renderable.
 pub mod mesh;
+/// Used for GUI applications to handle operating system specific tasks (e.g. requesting input and
+/// creating windows).
 pub mod os;
+/// Handles the system side of ECS.
 pub mod system;
 
 pub use crate::{

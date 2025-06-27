@@ -26,6 +26,7 @@ where
 {
     window: Option<Arc<Window>>,
     renderer: Option<Arc<Mutex<R>>>,
+    /// The world being rendered by the [`App`].
     pub world: World<'a>,
     input: Arc<Mutex<InputManager>>,
     camera: Arc<Mutex<C>>,

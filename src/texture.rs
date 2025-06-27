@@ -1,12 +1,20 @@
+/// A WGPU texture representing the underlying data used by WGPU to actually attach the texture to
+/// an object.
 pub struct Texture {
-    pub texture: wgpu::Texture,
-    pub view: wgpu::TextureView,
-    pub sampler: wgpu::Sampler
+    pub(crate) texture: wgpu::Texture,
+    pub(crate) view: wgpu::TextureView,
+    pub(crate) sampler: wgpu::Sampler
 }
 
 impl Texture {
-    pub const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
+    pub(crate) const DEPTH_FORMAT: wgpu::TextureFormat = wgpu::TextureFormat::Depth32Float;
 
+    /// Creates a bind group from the underlying texture data.
+    ///
+    /// Should only be used internally or when creating a new renderer.
+    ///
+    /// Used to turn a texture into a bind group, which allows WGPU to actually make use of the
+    /// texture when rendering a mesh. Used by nearly every texture except for the depth texture.
     pub fn into_bind_group(self, device: &wgpu::Device, bind_group_layout: &wgpu::BindGroupLayout) -> wgpu::BindGroup {
         device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: bind_group_layout,
@@ -26,6 +34,9 @@ impl Texture {
         })
     }
 
+    /// Creates a depth texture.
+    ///
+    /// Should only be used internally or when creating a new renderer.
     pub fn create_depth_texture(device: &wgpu::Device, config: &wgpu::SurfaceConfiguration) -> Self {
         let size = wgpu::Extent3d {
             width: config.width.max(1),
@@ -65,12 +76,19 @@ impl Texture {
     }
 }
 
+/// Represents the raw data that will eventually be passed off to WGPU describing a texture.
+///
+/// For now, only holds raw image data describing the texture that will be applied to a given
+/// object, which can then be used to build the WGPU structures needed to apply that structure to
+/// an object when the builder is passed off to the renderer.
 #[derive(Clone, Debug)]
 pub struct TextureBuilder {
     image: image::RgbaImage
 }
 
 impl TextureBuilder {
+    /// Generates a [`TextureBuilder`] from an image which is placed in the res folder in the build
+    /// directory.
     pub fn from_image(filename: &str) -> Self {
         let diffuse_image = image::ImageReader::open(std::path::Path::new(env!("OUT_DIR")).join("res").join(filename)).unwrap().decode().unwrap();
 
@@ -79,6 +97,9 @@ impl TextureBuilder {
         }
     }
 
+    /// Builds the texture from the given configuration.
+    ///
+    /// Should only be used internally or when creating a new renderer.
     pub fn build(&self, device: &wgpu::Device, queue: &wgpu::Queue) -> Texture {
         let dimensions = self.image.dimensions();
 

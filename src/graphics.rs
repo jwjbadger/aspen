@@ -7,19 +7,37 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 use wgpu::util::DeviceExt;
 
+/// A generic renderer that can by used by the [`App`]
+///
+/// Any struct implementing this trait is interchangable as a renderer for the app, allowing for a
+/// variety of different types of renderers to be used depending on the necessities of the
+/// particular program.
+///
+/// [`App`]: crate::App
 pub trait Renderer<'a> {
+    /// Called every frame to attach any instances that should be rendered.
     fn attach<T>(&mut self, item: &T, instance: Instance)
     where
         T: Renderable;
+    /// Called every frame after attaching instances to render the frame to the screen.
     fn render(&mut self);
+    /// Called upon screen resize to update the renderer.
     fn resize(&mut self, physical_size: winit::dpi::PhysicalSize<u32>);
 }
 
+/// Implemented by any object that may be rendered.
 pub trait Renderable {
+    /// Optionally returns a texture builder if the renderer is to use textures.
     fn tex_builder(&self) -> Option<TextureBuilder>;
+    /// Returns a mesh that should be rendered by the renderer.
     fn mesh(&self) -> &Mesh;
 }
 
+/// A default renderer written in WGPU.
+///
+/// Currently cannot be used in web contexts although the functionality is planned to be
+/// implemented at some point in the future. This renderer should be used by default unless
+/// particular functionality is required that is absent.
 pub struct WgpuRenderer<'a> {
     surface: wgpu::Surface<'a>,
     device: wgpu::Device,
@@ -177,6 +195,13 @@ impl<'a> Renderer<'a> for WgpuRenderer<'a> {
 }
 
 impl<'a> WgpuRenderer<'a> {
+    /// Creates a new WGPU renderer.
+    ///
+    /// In almost all standard use cases, this should only be done by the [`App`] struct although
+    /// certain special cases may require manual instantiation if using a different method of
+    /// managing the window.
+    ///
+    /// [`App`]: crate::App
     pub async fn new(
         window: Arc<winit::window::Window>,
         camera: Arc<Mutex<impl Camera + 'a>>,
