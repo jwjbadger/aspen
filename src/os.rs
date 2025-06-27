@@ -14,19 +14,25 @@ use crate::{
     World,
 };
 
+/// The main application, which handles the window and world for GUI applications.
+///
+/// Responsible for managing the window, renderer, camera, user input, and world while 
+/// providing access to certain resourced systems that permit the management of the aforementioned
+/// resources.
 pub struct App<'a, C, R = WgpuRenderer<'a>>
 where
     R: Renderer<'a>,
     C: Camera + 'a,
 {
     window: Option<Arc<Window>>,
-    pub renderer: Option<Arc<Mutex<R>>>,
+    renderer: Option<Arc<Mutex<R>>>,
     pub world: World<'a>,
     input: Arc<Mutex<InputManager>>,
     camera: Arc<Mutex<C>>,
 }
 
 impl<'a, C: Camera + 'a> App<'a, C> {
+    /// Creates a new world with a camera and world.
     pub fn new(world: World<'a>, camera: Arc<Mutex<C>>) -> Self {
         Self {
             window: None,
@@ -37,6 +43,13 @@ impl<'a, C: Camera + 'a> App<'a, C> {
         }
     }
 
+    /// Indicates the ready state of the app and launches it.
+    ///
+    /// Upon running, the app will create a new [`EventLoop`], which will propogate a resumed
+    /// signal that should create the window and renderer allowing the app to be visible. At this
+    /// point, input will begin being managed and all entities with a [`Model`] and [`Instance`]
+    /// component will be rendered to the screen. Input can be handled through the [`InputManager`]
+    /// struct.
     pub fn run(mut self) {
         let event_loop = EventLoop::new().expect("Couldn't create event loop");
         event_loop.set_control_flow(ControlFlow::Poll);
