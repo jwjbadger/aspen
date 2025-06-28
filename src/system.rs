@@ -12,6 +12,8 @@ use std::sync::{Arc, Mutex, MutexGuard};
 #[derive(Debug)]
 pub struct Query<'a> {
     matches: Vec<&'a mut Component<Arc<Mutex<dyn Any>>>>,
+    /// A list of all the entities that match the filter
+    pub entities: Vec<Entity>
 }
 
 impl<'a> Query<'a> {
@@ -19,33 +21,22 @@ impl<'a> Query<'a> {
         haystack: &'a mut Vec<Component<Arc<Mutex<dyn Any>>>>,
         filter: &HashSet<TypeId>,
     ) -> Self {
-        // TODO: unexpected behavior doesn't remove components that aren't in both
-        // how has this not been an issue yet
-        Self {
-            matches: haystack
+        // TODO: significantly increase frame rate by not performing this logic every frame
+        let matches: Vec<_> = haystack
                 .iter_mut()
                 .filter(|e| filter.contains(&(*e).type_id))
-                .collect(),
-        }
-    }
+                .collect();
+            
+        let entities = matches.iter().flat_map(|e| e.data.keys().cloned()).fold(HashMap::new(), |mut map, val| {
+            *(map.entry(val).or_insert(0)) += 1;
+            map
+        }).into_iter().filter(|(_, value)| { *value == filter.len() }).map(|(key, _)| {key}).collect();
 
-    /// Returns all entities that match the given query and are of a specific component
-    ///
-    /// This should be the same as getting all entities that match the given query, but because of
-    /// faulty logic in the creation of queries, all entities that have any component in the query
-    /// will currently match it, meaning this function will return different entities depending on
-    /// the associated component.
-    pub fn get_entities<T: 'static>(&self) -> Vec<Entity> {
-        self.matches
-            .iter()
-            .filter(|e| e.type_id == TypeId::of::<T>())
-            .flat_map(|e| {
-                e.data
-                    .iter()
-                    .map(|(k, _)| k.clone())
-                    .collect::<Vec<Entity>>()
-            })
-            .collect()
+
+        Self {
+            matches,
+            entities
+        }
     }
 
     /// Returns a component on a particular entity if that component exists
@@ -64,7 +55,7 @@ impl<'a> Query<'a> {
             .filter(|e| e.type_id == TypeId::of::<T>())
             .next()
             {
-                Some(component) => component.data.get(ent).map(|v| v.clone()),
+                Some(component) => { if self.entities.contains(&ent) { component.data.get(ent).map(|v| v.clone())} else { None } },
                 None => None,
             }
     }
@@ -84,7 +75,7 @@ impl<'a> Query<'a> {
                     .iter()
                     .map(|(k, v)| (k.clone(), v.clone()))
                     .collect::<Vec<(Entity, Arc<Mutex<dyn Any>>)>>()
-            })
+            }).filter(|(entity, _)| self.entities.contains(entity))
         .collect()
     }
 
@@ -94,7 +85,7 @@ impl<'a> Query<'a> {
             .iter_mut()
             .filter(|e| e.type_id == TypeId::of::<T>())
             .for_each(|e| {
-                e.data.iter_mut().for_each(|(_, v)| {
+                e.data.iter_mut().filter(|(e, _)| {self.entities.contains(e)}).for_each(|(_, v)| {
                     f(v.lock().unwrap().downcast_mut::<T>().unwrap());
                 });
             });
@@ -115,7 +106,7 @@ impl<'a> Query<'a> {
             .filter(|e| e.type_id == TypeId::of::<T>())
             .flat_map(|e| {
                 e.data
-                    .iter()
+                    .iter().filter(|(e, _)| self.entities.contains(e))
                     .map(|(k, v)| (k.clone(), v.lock().unwrap())) // TODO: can we directly deref
                     .collect::<Vec<(Entity, MutexGuard<dyn Any>)>>()
             })

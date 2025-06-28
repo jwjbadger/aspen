@@ -75,7 +75,7 @@ fn main() {
         ],
         |mut query: Query| {
             let camera_mutex = query
-                .get::<FlyCamera>(&query.get_entities::<FlyCamera>()[0])
+                .get::<FlyCamera>(&query.entities[0])
                 .expect("Camera not found");
             let mut camera_guard = camera_mutex.lock().unwrap();
 
