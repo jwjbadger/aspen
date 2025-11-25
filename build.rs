@@ -22,8 +22,14 @@ fn copy_dir(src: impl AsRef<Path>, dst: impl AsRef<Path>) -> io::Result<()> {
 }
 
 fn main() {
+    let res = Path::new("examples/res");
+
+    if !res.exists() {
+        return;
+    }
+
     copy_dir(
-        Path::new("examples/res"),
+        res,
         Path::new(&std::env::var("OUT_DIR").unwrap()).join("res"),
     )
     .unwrap();
